@@ -1,10 +1,7 @@
-from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import Profile
-
-User = get_user_model()
+from .models import Profile, User
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -16,11 +13,15 @@ class RegisterSerializer(serializers.Serializer):
     def validate_email(self, value):
         value = value.lower()
         if User.objects.filter(email=value, is_email_verified=True).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
+            raise serializers.ValidationError(
+                "An account with this email already exists."
+            )
         return value
 
     def validate(self, attrs):
-        validate_password(attrs["password"], User(email=attrs["email"], full_name=attrs["full_name"]))
+        validate_password(
+            attrs["password"], User(email=attrs["email"], full_name=attrs["full_name"])
+        )
         return attrs
 
 
@@ -31,7 +32,9 @@ class LoginSerializer(serializers.Serializer):
 
 class OTPVerifySerializer(serializers.Serializer):
     challenge_id = serializers.CharField()
-    code = serializers.RegexField(r"^\d{6}$", error_messages={"invalid": "Enter the 6-digit code."})
+    code = serializers.RegexField(
+        r"^\d{6}$", error_messages={"invalid": "Enter the 6-digit code."}
+    )
 
 
 class ResendSerializer(serializers.Serializer):
@@ -54,7 +57,17 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ["full_name", "email", "role", "avatar_url", "phone", "bio", "city", "business_name", "gstin"]
+        fields = (
+            "full_name",
+            "email",
+            "role",
+            "avatar_url",
+            "phone",
+            "bio",
+            "city",
+            "business_name",
+            "gstin",
+        )
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})

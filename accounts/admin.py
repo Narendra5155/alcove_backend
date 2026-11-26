@@ -11,11 +11,11 @@ class ProfileInline(admin.StackedInline):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    inlines = [ProfileInline]
-    ordering = ["-date_joined"]
-    list_display = ["email", "full_name", "role", "is_email_verified", "is_active", "date_joined"]
-    list_filter = ["role", "is_email_verified", "is_active", "is_staff"]
-    search_fields = ["email", "full_name"]
+    inlines = (ProfileInline,)
+    ordering = ("-date_joined",)
+    list_display = ("email", "full_name", "role", "is_email_verified", "is_active", "date_joined")
+    list_filter = ("role", "is_email_verified", "is_active", "is_staff")
+    search_fields = ("email", "full_name")
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Info", {"fields": ("full_name", "role", "is_email_verified")}),

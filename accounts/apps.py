@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from django.apps import AppConfig
 
 
@@ -6,4 +8,5 @@ class AccountsConfig(AppConfig):
     name = "accounts"
 
     def ready(self):
-        from . import signals  # noqa: F401
+        # Register signal receivers (e.g. auto-create Profile on User creation).
+        import_module(f"{self.name}.signals")

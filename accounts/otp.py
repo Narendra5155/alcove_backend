@@ -1,8 +1,10 @@
 """Email OTP challenges stored in Redis (hashed, TTL-bound, attempt-limited)."""
+
 import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
+from typing import cast
 
 from django.conf import settings
 
@@ -42,14 +44,24 @@ def create_challenge(user, purpose: str) -> Challenge:
     r = get_redis()
     cid = secrets.token_urlsafe(24)
     code = _new_code()
-    r.hset(_key(cid), mapping={"user_id": user.pk, "purpose": purpose, "hash": _hash(cid, code), "attempts": 0})
+    r.hset(
+        _key(cid),
+        mapping={
+            "user_id": user.pk,
+            "purpose": purpose,
+            "hash": _hash(cid, code),
+            "attempts": 0,
+        },
+    )
     r.expire(_key(cid), settings.OTP_TTL_SECONDS)
     r.set(f"{_key(cid)}:cooldown", 1, ex=settings.OTP_RESEND_COOLDOWN)
     return Challenge(cid, user.pk, purpose, code)
 
 
-def get_challenge(cid: str) -> dict:
-    data = get_redis().hgetall(_key(cid)) if cid else {}
+def get_challenge(cid: str) -> dict[str, str]:
+    # redis-py types sync and asyncio clients together, so hgetall() is typed as
+    # `dict | Awaitable[dict]`. Our client is sync with decode_responses=True.
+    data = cast("dict[str, str]", get_redis().hgetall(_key(cid))) if cid else {}
     if not data:
         raise OTPError("This code has expired. Please request a new one.")
     return data
@@ -59,7 +71,9 @@ def resend(cid: str) -> Challenge:
     r = get_redis()
     data = get_challenge(cid)
     if r.exists(f"{_key(cid)}:cooldown"):
-        raise OTPError(f"Please wait {r.ttl(f'{_key(cid)}:cooldown')}s before requesting another code.")
+        raise OTPError(
+            f"Please wait {r.ttl(f'{_key(cid)}:cooldown')}s before requesting another code."
+        )
     code = _new_code()
     r.hset(_key(cid), mapping={"hash": _hash(cid, code), "attempts": 0})
     r.expire(_key(cid), settings.OTP_TTL_SECONDS)
@@ -82,6 +96,8 @@ def verify(cid: str, code: str, purpose: str) -> int:
         if left <= 0:
             r.delete(_key(cid))
             raise OTPError("Too many attempts. Please start again.")
-        raise OTPError(f"Incorrect code. {left} attempt{'s' if left != 1 else ''} left.")
+        raise OTPError(
+            f"Incorrect code. {left} attempt{'s' if left != 1 else ''} left."
+        )
     r.delete(_key(cid), f"{_key(cid)}:cooldown")
     return int(data["user_id"])

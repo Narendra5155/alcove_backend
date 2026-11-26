@@ -10,7 +10,7 @@ SUBJECTS = {
 
 
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
-def send_otp_email(email, name, code, purpose):
+def send_otp_email(email: str, name: str, code: str, purpose: str) -> None:
     ctx = {"name": name, "code": code, "purpose": purpose}
     send_mail(
         subject=SUBJECTS.get(purpose, "Your Alcove code"),
@@ -19,3 +19,4 @@ def send_otp_email(email, name, code, purpose):
         from_email=None,
         recipient_list=[email],
     )
+

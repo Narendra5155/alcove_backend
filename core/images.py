@@ -1,4 +1,5 @@
 """Image helpers: validation and resizing for uploads."""
+
 from io import BytesIO
 
 from django.core.exceptions import ValidationError
@@ -16,7 +17,7 @@ def validate_image(f):
         img = Image.open(f)
         fmt = img.format
         img.verify()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise ValidationError("Upload a valid image file.") from exc
     finally:
         f.seek(0)

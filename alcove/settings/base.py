@@ -1,4 +1,5 @@
 """Base settings for the Alcove project."""
+
 from datetime import timedelta
 from pathlib import Path
 
@@ -15,7 +16,9 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY", default="dev-insecure-change-me")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:8000"])
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS", default=["http://localhost:8000"]
+)
 
 INSTALLED_APPS = [
     "daphne",
@@ -88,15 +91,24 @@ DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
 # Django on the host (macOS + Homebrew): point GeoDjango at GDAL/GEOS if present.
 _BREW_LIB = Path("/opt/homebrew/lib")
 if (_BREW_LIB / "libgdal.dylib").exists():
-    GDAL_LIBRARY_PATH = env("GDAL_LIBRARY_PATH", default=str(_BREW_LIB / "libgdal.dylib"))
+    GDAL_LIBRARY_PATH = env(
+        "GDAL_LIBRARY_PATH", default=str(_BREW_LIB / "libgdal.dylib")
+    )
 if (_BREW_LIB / "libgeos_c.dylib").exists():
-    GEOS_LIBRARY_PATH = env("GEOS_LIBRARY_PATH", default=str(_BREW_LIB / "libgeos_c.dylib"))
+    GEOS_LIBRARY_PATH = env(
+        "GEOS_LIBRARY_PATH", default=str(_BREW_LIB / "libgeos_c.dylib")
+    )
 
 AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 8},
+    },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -120,7 +132,9 @@ LOGIN_URL = "/login/"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # Map tiles (override with a commercial provider URL for production traffic)
-MAP_TILE_URL = env("MAP_TILE_URL", default="https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+MAP_TILE_URL = env(
+    "MAP_TILE_URL", default="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+)
 MAP_TILE_ATTRIBUTION = env(
     "MAP_TILE_ATTRIBUTION",
     default='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -154,14 +168,25 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_BEAT_SCHEDULE = {
-    "expire-pending-bookings": {"task": "bookings.tasks.expire_pending_bookings", "schedule": 60.0},
-    "checkin-reminders": {"task": "bookings.tasks.send_checkin_reminders", "schedule": 3600.0},
-    "purge-stale-positions": {"task": "locations.tasks.purge_stale_positions", "schedule": 60.0},
+    "expire-pending-bookings": {
+        "task": "bookings.tasks.expire_pending_bookings",
+        "schedule": 60.0,
+    },
+    "checkin-reminders": {
+        "task": "bookings.tasks.send_checkin_reminders",
+        "schedule": 3600.0,
+    },
+    "purge-stale-positions": {
+        "task": "locations.tasks.purge_stale_positions",
+        "schedule": 60.0,
+    },
 }
 
 # ---------------------------------------------------------------- Email
 # Brevo SMTP when BREVO_SMTP_KEY is set; otherwise generic EMAIL_* (Mailpit in docker-compose dev).
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
+)
 if env("BREVO_SMTP_KEY", default=""):
     EMAIL_HOST = env("BREVO_SMTP_SERVER", default="smtp-relay.brevo.com")
     EMAIL_PORT = env.int("BREVO_MAIL_PORT", default=587)
@@ -180,7 +205,9 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Alcove <no-reply@alcove.
 
 # ---------------------------------------------------------------- DRF / JWT
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["accounts.authentication.CookieJWTAuthentication"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "accounts.authentication.CookieJWTAuthentication"
+    ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_THROTTLE_RATES": {"auth": "10/min", "otp": "10/min"},
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",

@@ -1,4 +1,4 @@
-from .base import *  # noqa: F401,F403
+from .base import *
 
 CELERY_TASK_ALWAYS_EAGER = True
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
@@ -12,7 +12,10 @@ CACHES = {
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
     }
 }
-REST_FRAMEWORK = {**REST_FRAMEWORK, "DEFAULT_THROTTLE_RATES": {"auth": "1000/min", "otp": "1000/min"}}
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_THROTTLE_RATES": {"auth": "1000/min", "otp": "1000/min"},
+}
 PAYMENTS_DEMO_FALLBACK = True
 RAZORPAY_KEY_ID = ""
 RAZORPAY_KEY_SECRET = ""

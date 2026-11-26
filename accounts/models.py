@@ -1,11 +1,17 @@
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from typing import ClassVar
+
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models
 from django.utils import timezone
 
 from core.images import resize_image, validate_image
 
 
-class UserManager(BaseUserManager):
+class UserManager(BaseUserManager["User"]):
     use_in_migrations = True
 
     def _create_user(self, email, password, **extra):
@@ -23,7 +29,12 @@ class UserManager(BaseUserManager):
         return self._create_user(email, password, **extra)
 
     def create_superuser(self, email, password=None, **extra):
-        extra.update(is_staff=True, is_superuser=True, is_email_verified=True, role=User.Role.OWNER)
+        extra.update(
+            is_staff=True,
+            is_superuser=True,
+            is_email_verified=True,
+            role=User.Role.OWNER,
+        )
         return self._create_user(email, password, **extra)
 
 
@@ -40,11 +51,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
-    objects = UserManager()
+    objects: ClassVar[UserManager] = UserManager()
 
     USERNAME_FIELD = "email"
     EMAIL_FIELD = "email"
-    REQUIRED_FIELDS = ["full_name"]
+    REQUIRED_FIELDS: ClassVar[list[str]] = [
+        "full_name",
+    ]
 
     def __str__(self):
         return self.email
@@ -73,7 +86,9 @@ def avatar_path(instance, filename):
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    avatar = models.ImageField(upload_to=avatar_path, blank=True, validators=[validate_image])
+    avatar = models.ImageField(
+        upload_to=avatar_path, blank=True, validators=[validate_image]
+    )
     phone = models.CharField(max_length=20, blank=True)
     bio = models.TextField(max_length=500, blank=True)
     city = models.CharField(max_length=80, blank=True)
@@ -89,7 +104,9 @@ class Profile(models.Model):
         validate_image(uploaded)
         if self.avatar:
             self.avatar.delete(save=False)
-        self.avatar.save("avatar.jpg", resize_image(uploaded, (400, 400), crop=True), save=True)
+        self.avatar.save(
+            "avatar.jpg", resize_image(uploaded, (400, 400), crop=True), save=True
+        )
 
     @property
     def avatar_url(self):

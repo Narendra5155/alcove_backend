@@ -1,4 +1,5 @@
 """DRF authentication reading the JWT from an HttpOnly cookie (with CSRF enforcement)."""
+
 from django.conf import settings
 from rest_framework import exceptions
 from rest_framework.authentication import CSRFCheck

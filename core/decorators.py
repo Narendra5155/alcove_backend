@@ -3,6 +3,8 @@ from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 
+from accounts.models import User
+
 
 def role_required(role):
     """Require an authenticated user with the given role (OWNER / RENTER)."""
@@ -20,5 +22,5 @@ def role_required(role):
     return decorator
 
 
-owner_required = role_required("OWNER")
-renter_required = role_required("RENTER")
+owner_required = role_required(User.Role.OWNER)
+renter_required = role_required(User.Role.RENTER)

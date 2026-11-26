@@ -28,13 +28,14 @@ def validate_image(f):
 def resize_image(f, size, crop=False) -> ContentFile:
     """Return a JPEG ContentFile no larger than `size` (w, h)."""
     img = Image.open(f)
-    img = ImageOps.exif_transpose(img).convert("RGB")
-    img = ImageOps.fit(img, size, Image.LANCZOS) if crop else _thumb(img, size)
+    ImageOps.exif_transpose(img, in_place=True)  # fix phone-camera rotation
+    img = img.convert("RGB")
+    img = ImageOps.fit(img, size, Image.Resampling.LANCZOS) if crop else _thumb(img, size)
     buf = BytesIO()
     img.save(buf, "JPEG", quality=85, optimize=True)
     return ContentFile(buf.getvalue())
 
 
 def _thumb(img, size):
-    img.thumbnail(size, Image.LANCZOS)
+    img.thumbnail(size, Image.Resampling.LANCZOS)
     return img

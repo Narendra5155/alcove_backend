@@ -1,0 +1,205 @@
+{% extends "dashboard/_owner_layout.html" %}
+{% block title %}{% if property %}Edit {{ property.name }}{% else %}Add a property{% endif %} · Alcove{% endblock %}
+{% block head %}{% include "partials/leaflet.html" %}{% endblock %}
+{% block dash %}
+<div x-data="propertyForm({{ property.id|default:'null' }})" class="max-w-4xl">
+  <h1 class="text-3xl font-extrabold">{% if property %}Edit property{% else %}Add a property{% endif %}</h1>
+  {% if not property %}<p class="mt-1 text-ink-500">Start with the basics and the location. You'll add photos and rooms next.</p>{% endif %}
+
+  <form @submit.prevent="save()" class="mt-6 space-y-6">
+    <section class="panel grid gap-4 p-6 sm:grid-cols-2">
+      <h2 class="text-xl font-bold sm:col-span-2">Details</h2>
+      <div class="sm:col-span-2"><label class="label" for="name">Property name</label><input id="name" class="field" x-model="p.name" required maxlength="150"></div>
+      <div><label class="label" for="type">Type</label>
+        <select id="type" class="field" x-model="p.property_type">{% for v, l in types %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="flex items-end"><label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="p.is_active" class="rounded border-ink-300 text-ink focus:ring-marigold"> Show this property in search</label></div>
+      <div class="sm:col-span-2"><label class="label" for="desc">Description</label><textarea id="desc" rows="5" class="field" x-model="p.description" placeholder="What makes it a good place to stay? Mention the neighbourhood, the rooms and anything guests should know."></textarea></div>
+      <div><label class="label" for="cin">Check-in from</label><input id="cin" type="time" class="field" x-model="p.check_in_time"></div>
+      <div><label class="label" for="cout">Check-out by</label><input id="cout" type="time" class="field" x-model="p.check_out_time"></div>
+      <div class="sm:col-span-2"><label class="label" for="rules">House rules</label><textarea id="rules" rows="3" class="field" x-model="p.house_rules" placeholder="e.g. No smoking indoors. Quiet hours after 10 PM."></textarea></div>
+    </section>
+
+    <section class="panel grid gap-4 p-6 sm:grid-cols-2">
+      <div class="sm:col-span-2">
+        <h2 class="text-xl font-bold">Location</h2>
+        <p class="text-sm text-ink-500">Type the address and press "Find on map", then drag the pin to the exact entrance.</p>
+      </div>
+      <div class="sm:col-span-2"><label class="label" for="addr">Street address</label><input id="addr" class="field" x-model="p.address" required></div>
+      <div><label class="label" for="city">City</label><input id="city" class="field" x-model="p.city" required></div>
+      <div><label class="label" for="state">State</label><input id="state" class="field" x-model="p.state"></div>
+      <div><label class="label" for="pin">PIN code</label><input id="pin" class="field" x-model="p.pincode" inputmode="numeric" maxlength="10"></div>
+      <div class="flex items-end gap-2"><button type="button" class="btn-ghost" @click="geocode()" :disabled="geocoding" x-text="geocoding ? 'Searching…' : 'Find on map'"></button>
+        <span class="text-xs text-ink-500" x-show="p.lat" x-text="p.lat && `${Number(p.lat).toFixed(5)}, ${Number(p.lng).toFixed(5)}`"></span></div>
+      <div class="sm:col-span-2"><div x-ref="map" class="h-80 overflow-hidden rounded-xl border border-ink-100"></div>
+        <p class="error-text" x-show="errors.lat" x-text="errors.lat"></p></div>
+    </section>
+
+    <section class="panel p-6">
+      <h2 class="text-xl font-bold">Amenities</h2>
+      <div class="mt-3 flex flex-wrap gap-2">
+        {% for a in amenities %}
+        <label class="chip cursor-pointer border py-1.5" :class="p.amenity_ids.includes({{ a.id }}) ? 'border-ink bg-ink text-white' : 'border-ink-100 bg-white'">
+          <input type="checkbox" class="sr-only" :checked="p.amenity_ids.includes({{ a.id }})" @change="toggle({{ a.id }})">{{ a.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </section>
+
+    <div class="flex items-center gap-3">
+      <button class="btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : (id ? 'Save changes' : 'Save and continue')"></button>
+      <p class="error-text mt-0" x-show="error" x-text="error"></p>
+    </div>
+  </form>
+
+  <template x-if="id">
+    <div class="mt-10 space-y-6">
+      <!-- photos -->
+      <section class="panel p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 class="text-xl font-bold">Photos</h2><p class="text-sm text-ink-500">Up to 20. The cover photo leads your listing.</p></div>
+          <label class="btn-ghost cursor-pointer"><input type="file" multiple accept="image/jpeg,image/png,image/webp" class="sr-only" @change="upload($event)"><span x-text="uploading ? 'Uploading…' : 'Add photos'"></span></label>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <template x-for="img in p.images" :key="img.id">
+            <div class="group relative aspect-square overflow-hidden rounded-xl bg-ink-50">
+              <img :src="img.url" alt="" class="h-full w-full object-cover">
+              <span x-show="img.is_cover" class="chip absolute left-2 top-2 bg-marigold text-ink">Cover</span>
+              <div class="absolute inset-x-2 bottom-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                <button type="button" x-show="!img.is_cover" class="btn-ghost flex-1 px-2 py-1 text-xs" @click="makeCover(img)">Make cover</button>
+                <button type="button" class="btn-danger px-2 py-1 text-xs" @click="removeImage(img)" aria-label="Delete photo">Delete</button>
+              </div>
+            </div>
+          </template>
+        </div>
+        <p x-show="!p.images.length" class="mt-3 text-sm text-ink-500">No photos yet. Listings with photos get booked far more often.</p>
+      </section>
+
+      <!-- rooms -->
+      <section class="panel p-6">
+        <div class="flex items-center justify-between"><div><h2 class="text-xl font-bold">Rooms</h2><p class="text-sm text-ink-500">Add each room type with how many identical units you have.</p></div>
+          <button type="button" class="btn-ghost" @click="editRoom({})">Add room type</button></div>
+        <ul class="mt-4 divide-y divide-ink-100">
+          <template x-for="r in p.rooms" :key="r.id">
+            <li class="flex flex-wrap items-center gap-3 py-3">
+              <div class="min-w-0 flex-1"><p class="font-semibold" x-text="r.name"></p>
+                <p class="text-sm text-ink-500" x-text="`${Alcove.money(r.price_per_night)}/night · sleeps ${r.max_guests} · ${r.quantity} unit${r.quantity > 1 ? 's' : ''}${r.is_active ? '' : ' · hidden'}`"></p></div>
+              <button type="button" class="btn-ghost px-3 py-1.5" @click="editRoom(r)">Edit</button>
+              <button type="button" class="btn-danger px-3 py-1.5" @click="deleteRoom(r)">Delete</button>
+            </li>
+          </template>
+        </ul>
+        <form x-show="room" x-cloak @submit.prevent="saveRoom()" class="mt-4 grid gap-3 rounded-xl bg-paper p-4 sm:grid-cols-3">
+          <div class="sm:col-span-2"><label class="label" for="rn">Room name</label><input id="rn" class="field" :value="room && room.name" @input="room.name = $event.target.value" placeholder="Deluxe double" required></div>
+          <div><label class="label" for="rp">Price per night (₹)</label><input id="rp" type="number" min="1" step="1" class="field" :value="room && room.price_per_night" @input="room.price_per_night = $event.target.value" required></div>
+          <div><label class="label" for="rg">Max guests</label><input id="rg" type="number" min="1" max="20" class="field" :value="room && room.max_guests" @input="room.max_guests = +$event.target.value"></div>
+          <div><label class="label" for="rb">Beds</label><input id="rb" type="number" min="1" max="10" class="field" :value="room && room.beds" @input="room.beds = +$event.target.value"></div>
+          <div><label class="label" for="rq">Units</label><input id="rq" type="number" min="1" max="500" class="field" :value="room && room.quantity" @input="room.quantity = +$event.target.value"></div>
+          <div class="sm:col-span-3"><label class="label" for="rd">Description</label><input id="rd" class="field" :value="room && room.description" @input="room.description = $event.target.value"></div>
+          <label class="flex items-center gap-2 text-sm sm:col-span-3"><input type="checkbox" :checked="room && room.is_active" @change="room.is_active = $event.target.checked" class="rounded border-ink-300 text-ink focus:ring-marigold"> Available to book</label>
+          <div class="flex gap-2 sm:col-span-3"><button class="btn-primary" x-text="room && room.id ? 'Save room' : 'Add room'"></button><button type="button" class="btn-ghost" @click="room = null">Cancel</button>
+            <p class="error-text" x-text="roomError"></p></div>
+        </form>
+      </section>
+
+      <section class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose/30 p-6">
+        <div><p class="font-semibold">Delete this property</p><p class="text-sm text-ink-500">Only possible when it has no active bookings. Hide it from search instead to pause bookings.</p></div>
+        <button type="button" class="btn-danger" @click="destroy()">Delete property</button>
+      </section>
+    </div>
+  </template>
+</div>
+<script>
+function propertyForm(id) {
+  return {
+    id, saving: false, uploading: false, geocoding: false, error: "", errors: {}, room: null, roomError: "", map: null, pin: null,
+    p: { name: "", property_type: "HOTEL", description: "", address: "", city: "", state: "", pincode: "", lat: null, lng: null,
+         amenity_ids: [], check_in_time: "12:00", check_out_time: "11:00", house_rules: "", is_active: true, images: [], rooms: [] },
+    async init() {
+      if (this.id) {
+        const d = await Alcove.api(`/api/owner/properties/${this.id}/`);
+        Object.assign(this.p, d); this.p.amenity_ids = d.amenity_ids || [];
+      }
+      const boot = () => {
+        if (!window.L || !window.AlcoveMap) return setTimeout(boot, 50);
+        const has = this.p.lat != null;
+        this.map = AlcoveMap.create(this.$refs.map, has ? { lat: this.p.lat, lng: this.p.lng, zoom: 16 } : {});
+        if (has) this.placePin(this.p.lat, this.p.lng);
+        this.map.on("click", (e) => this.placePin(e.latlng.lat, e.latlng.lng));
+      };
+      boot();
+    },
+    placePin(lat, lng) {
+      this.p.lat = lat; this.p.lng = lng; this.errors.lat = "";
+      if (!this.pin) {
+        this.pin = L.marker([lat, lng], { draggable: true, icon: AlcoveMap.homeIcon() }).addTo(this.map);
+        this.pin.on("dragend", () => { const ll = this.pin.getLatLng(); this.p.lat = ll.lat; this.p.lng = ll.lng; });
+      } else this.pin.setLatLng([lat, lng]);
+    },
+    async geocode() {
+      const q = [this.p.address, this.p.city, this.p.state, this.p.pincode, "India"].filter(Boolean).join(", ");
+      if (!this.p.city) { this.error = "Add the city first."; return; }
+      this.geocoding = true; this.error = "";
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
+        const [hit] = await r.json();
+        if (!hit) { this.error = "We couldn't find that address. Click the map to place the pin."; return; }
+        this.placePin(+hit.lat, +hit.lon); this.map.setView([+hit.lat, +hit.lon], 16);
+      } catch (_) { this.error = "Address search is unavailable. Click the map to place the pin."; }
+      finally { this.geocoding = false; }
+    },
+    toggle(a) { const i = this.p.amenity_ids.indexOf(a); i >= 0 ? this.p.amenity_ids.splice(i, 1) : this.p.amenity_ids.push(a); },
+    async save() {
+      if (this.p.lat == null) { this.errors = { lat: "Place the pin on the map." }; return; }
+      this.saving = true; this.error = ""; this.errors = {};
+      const { images, rooms, slug, id, ...body } = this.p;
+      body.lat = +Number(body.lat).toFixed(6); body.lng = +Number(body.lng).toFixed(6);
+      try {
+        const d = await Alcove.api(this.id ? `/api/owner/properties/${this.id}/` : "/api/owner/properties/", { method: this.id ? "PATCH" : "POST", body });
+        if (!this.id) { location.href = `/dashboard/owner/properties/${d.id}/edit/?created=1`; return; }
+        Alpine.store("toasts").push({ title: "Property saved", kind: "success" });
+      } catch (e) { this.error = e.message; this.errors = e.data || {}; }
+      finally { this.saving = false; }
+    },
+    async upload(e) {
+      const files = [...e.target.files]; if (!files.length) return;
+      const fd = new FormData(); files.forEach((f) => fd.append("images", f));
+      this.uploading = true;
+      try {
+        await Alcove.api(`/api/owner/properties/${this.id}/images/`, { method: "POST", form: fd });
+        this.p.images = (await Alcove.api(`/api/owner/properties/${this.id}/`)).images;
+      } catch (err) { Alpine.store("toasts").push({ title: err.message, kind: "error" }); }
+      finally { this.uploading = false; e.target.value = ""; }
+    },
+    async makeCover(img) {
+      await Alcove.api(`/api/owner/properties/${this.id}/images/${img.id}/`, { method: "PATCH", body: { is_cover: true } });
+      this.p.images.forEach((i) => (i.is_cover = i.id === img.id));
+    },
+    async removeImage(img) {
+      await Alcove.api(`/api/owner/properties/${this.id}/images/${img.id}/`, { method: "DELETE" });
+      this.p.images = (await Alcove.api(`/api/owner/properties/${this.id}/`)).images;
+    },
+    editRoom(r) { this.roomError = ""; this.room = { name: "", price_per_night: "", max_guests: 2, beds: 1, quantity: 1, description: "", is_active: true, ...r }; },
+    async saveRoom() {
+      this.roomError = "";
+      const r = this.room, url = r.id ? `/api/owner/properties/${this.id}/rooms/${r.id}/` : `/api/owner/properties/${this.id}/rooms/`;
+      try {
+        const saved = await Alcove.api(url, { method: r.id ? "PATCH" : "POST", body: r });
+        const i = this.p.rooms.findIndex((x) => x.id === saved.id);
+        i >= 0 ? this.p.rooms.splice(i, 1, saved) : this.p.rooms.push(saved);
+        this.room = null;
+      } catch (e) { this.roomError = e.message; }
+    },
+    async deleteRoom(r) {
+      if (!confirm(`Delete "${r.name}"?`)) return;
+      try { await Alcove.api(`/api/owner/properties/${this.id}/rooms/${r.id}/`, { method: "DELETE" }); this.p.rooms = this.p.rooms.filter((x) => x.id !== r.id); }
+      catch (e) { Alpine.store("toasts").push({ title: e.message, kind: "error" }); }
+    },
+    async destroy() {
+      if (!confirm("Delete this property permanently?")) return;
+      try { await Alcove.api(`/api/owner/properties/${this.id}/`, { method: "DELETE" }); location.href = "/dashboard/owner/properties/"; }
+      catch (e) { Alpine.store("toasts").push({ title: e.message, kind: "error" }); }
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,6 @@
+{# usage: include with u=<user> size="h-9 w-9" #}
+{% if u.profile.avatar %}
+  <img src="{{ u.profile.avatar.url }}" alt="" class="{{ size|default:'h-9 w-9' }} rounded-full object-cover">
+{% else %}
+  <span class="{{ size|default:'h-9 w-9' }} inline-flex items-center justify-center rounded-full bg-marigold-100 text-xs font-bold text-ink">{{ u.initials }}</span>
+{% endif %}

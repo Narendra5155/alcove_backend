@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}{{ property.name }}, {{ property.city }} · Alcove{% endblock %}
+{% block description %}{{ property.description|truncatechars:150 }}{% endblock %}
+{% block head %}{% include "partials/leaflet.html" %}{% endblock %}
+{% block content %}
+{% with imgs=property.images.all %}
+<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6" x-data="propertyPage()">
+  <nav class="text-sm text-ink-500"><a href="{% url 'search' %}" class="hover:text-ink">Stays</a> / <a href="{% url 'search' %}?q={{ property.city|urlencode }}" class="hover:text-ink">{{ property.city }}</a></nav>
+  <div class="mt-2 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-4xl font-extrabold sm:text-5xl">{{ property.name }}</h1>
+      <p class="mt-2 text-ink-500">{{ property.get_property_type_display }} · {{ property.address }}, {{ property.city }}
+        {% if property.rating %} · <span class="font-semibold text-ink">★ {{ property.rating|floatformat:1 }}</span> ({{ reviews|length }} review{{ reviews|length|pluralize }}){% endif %}</p>
+    </div>
+  </div>
+
+  <!-- gallery: tall arch + grid -->
+  <div class="mt-6 grid gap-3 md:grid-cols-[1.2fr_1fr]" x-data="{ idx: 0, open: false, imgs: [{% for i in imgs %}'{{ i.image.url }}'{% if not forloop.last %},{% endif %}{% endfor %}] }">
+    <button class="arch aspect-[4/5] bg-ink-50 md:aspect-auto md:h-[34rem]" @click="idx = 0; open = imgs.length > 0" aria-label="Open photos">
+      {% if imgs %}<img src="{{ imgs.0.image.url }}" alt="{{ property.name }}" class="h-full w-full object-cover">{% endif %}
+    </button>
+    <div class="hidden grid-cols-2 gap-3 md:grid">
+      {% for i in imgs|slice:"1:5" %}
+      <button class="overflow-hidden rounded-2xl bg-ink-50" @click="idx = {{ forloop.counter }}; open = true"><img src="{{ i.image.url }}" alt="" class="h-full w-full object-cover"></button>
+      {% empty %}<div class="col-span-2 rounded-2xl bg-ink-50"></div>{% endfor %}
+    </div>
+    <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/90 p-4" @keydown.escape.window="open = false" @keydown.arrow-right.window="idx = (idx + 1) % imgs.length" @keydown.arrow-left.window="idx = (idx - 1 + imgs.length) % imgs.length">
+      <button class="absolute right-4 top-4 text-2xl text-white" @click="open = false" aria-label="Close">✕</button>
+      <button class="absolute left-4 text-4xl text-white" @click="idx = (idx - 1 + imgs.length) % imgs.length" aria-label="Previous">‹</button>
+      <img :src="imgs[idx]" alt="" class="max-h-[85vh] max-w-full rounded-2xl">
+      <button class="absolute right-4 text-4xl text-white" @click="idx = (idx + 1) % imgs.length" aria-label="Next">›</button>
+      <p class="absolute bottom-4 text-sm text-white" x-text="(idx + 1) + ' / ' + imgs.length"></p>
+    </div>
+  </div>
+
+  <div class="mt-10 grid gap-10 lg:grid-cols-[1fr_24rem]">
+    <div class="min-w-0 space-y-10">
+      <section class="flex items-center gap-4 border-b border-ink-100 pb-8">
+        {% include "partials/avatar.html" with u=property.owner size="h-12 w-12" %}
+        <div>
+          <p class="font-semibold">Hosted by {{ property.owner.full_name }}</p>
+          <p class="text-sm text-ink-500">Check-in from {{ property.check_in_time|time:"g:i A" }} · Check-out by {{ property.check_out_time|time:"g:i A" }}</p>
+        </div>
+      </section>
+      {% if property.description %}<section><h2 class="text-2xl font-bold">About this place</h2><p class="mt-3 max-w-prose whitespace-pre-line leading-relaxed text-ink-700">{{ property.description }}</p></section>{% endif %}
+
+      <section>
+        <h2 class="text-2xl font-bold">Rooms</h2>
+        <p class="mt-1 text-sm text-ink-500" x-show="!(checkin && checkout)">Add dates to see what's available.</p>
+        <div class="mt-4 space-y-3">
+          <template x-for="r in rooms" :key="r.id">
+            <label class="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl border p-4 transition-colors"
+                   :class="[roomId === r.id ? 'border-ink bg-ink-50' : 'border-ink-100 bg-white', r.available === 0 && 'opacity-50 cursor-not-allowed']">
+              <input type="radio" name="room" class="sr-only" :value="r.id" :disabled="r.available === 0" @change="roomId = r.id; quote()">
+              <div class="min-w-0 flex-1">
+                <p class="font-semibold" x-text="r.name"></p>
+                <p class="text-sm text-ink-500">Sleeps <span x-text="r.max_guests"></span> · <span x-text="r.beds"></span> bed<span x-show="r.beds > 1">s</span></p>
+                <p class="mt-1 text-sm text-ink-700" x-show="r.description" x-text="r.description"></p>
+              </div>
+              <div class="text-right">
+                <p><span class="font-display text-xl font-bold" x-text="Alcove.money(r.price_per_night)"></span><span class="text-sm text-ink-500"> / night</span></p>
+                <p class="text-xs" :class="r.available === 0 ? 'text-rose' : r.available <= 2 ? 'text-marigold-700' : 'text-ink-500'"
+                   x-show="r.available != null" x-text="r.available === 0 ? 'Sold out for these dates' : r.available <= 2 ? `Only ${r.available} left` : `${r.available} available`"></p>
+              </div>
+            </label>
+          </template>
+        </div>
+      </section>
+
+      {% if property.amenities.all %}
+      <section>
+        <h2 class="text-2xl font-bold">What this place offers</h2>
+        <ul class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {% for a in property.amenities.all %}<li class="flex items-center gap-2 text-ink-700"><span class="h-1.5 w-1.5 rounded-full bg-marigold"></span>{{ a.name }}</li>{% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if property.house_rules %}<section><h2 class="text-2xl font-bold">House rules</h2><p class="mt-3 max-w-prose whitespace-pre-line text-ink-700">{{ property.house_rules }}</p></section>{% endif %}
+
+      <section>
+        <h2 class="text-2xl font-bold">Where you'll be</h2>
+        <p class="mt-1 text-ink-500">{{ property.address }}, {{ property.city }}{% if property.state %}, {{ property.state }}{% endif %}</p>
+        <div x-ref="map" class="mt-4 h-80 overflow-hidden rounded-2xl border border-ink-100"></div>
+      </section>
+
+      <section>
+        <h2 class="text-2xl font-bold">Reviews</h2>
+        {% for r in reviews %}
+        <article class="mt-5 border-b border-ink-100 pb-5">
+          <div class="flex items-center gap-3">
+            {% include "partials/avatar.html" with u=r.renter size="h-10 w-10" %}
+            <div><p class="font-semibold">{{ r.renter.first_name }}</p><p class="text-xs text-ink-500">{{ r.created_at|date:"F Y" }}</p></div>
+            <span class="ml-auto font-semibold text-marigold-700" aria-label="{{ r.rating }} out of 5">{% for _ in "12345"|make_list|slice:r.rating %}★{% endfor %}</span>
+          </div>
+          {% if r.comment %}<p class="mt-3 max-w-prose text-ink-700">{{ r.comment }}</p>{% endif %}
+        </article>
+        {% empty %}
+        <p class="mt-3 text-ink-500">No reviews yet. Guests can review after their stay.</p>
+        {% endfor %}
+      </section>
+    </div>
+
+    <!-- booking card -->
+    <aside class="lg:sticky lg:top-24 lg:self-start">
+      <div class="panel p-5">
+        <p><span class="font-display text-2xl font-bold" x-text="selectedRoom ? Alcove.money(selectedRoom.price_per_night) : '{% if property.starting_price %}₹{{ property.starting_price|floatformat:0 }}{% endif %}'"></span> <span class="text-ink-500">a night</span></p>
+        <div class="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-ink-100">
+          <label class="border-r border-ink-100 px-3 py-2"><span class="block text-xs font-semibold text-ink-500">Check in</span>
+            <input type="date" x-model="checkin" :min="today" @change="if (checkout && checkout <= checkin) checkout = ''; refresh()" class="w-full border-0 p-0 text-sm focus:ring-0"></label>
+          <label class="px-3 py-2"><span class="block text-xs font-semibold text-ink-500">Check out</span>
+            <input type="date" x-model="checkout" :min="checkin || today" @change="refresh()" class="w-full border-0 p-0 text-sm focus:ring-0"></label>
+          <label class="col-span-2 border-t border-ink-100 px-3 py-2"><span class="block text-xs font-semibold text-ink-500">Guests</span>
+            <select x-model.number="guests" class="w-full border-0 p-0 text-sm focus:ring-0"><template x-for="n in 10"><option :value="n" x-text="n + (n === 1 ? ' guest' : ' guests')" :selected="n === guests"></option></template></select></label>
+        </div>
+        <template x-if="q">
+          <dl class="mt-4 space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="text-ink-500" x-text="`${Alcove.money(q.nightly_rate)} × ${q.nights} night${q.nights > 1 ? 's' : ''}`"></dt><dd x-text="Alcove.money(q.subtotal)"></dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Taxes (12% GST)</dt><dd x-text="Alcove.money(q.taxes)"></dd></div>
+            <div class="flex justify-between border-t border-ink-100 pt-2 font-semibold"><dt>Total</dt><dd x-text="Alcove.money(q.total)"></dd></div>
+          </dl>
+        </template>
+        {% if user.is_authenticated and user.is_renter %}
+        <label class="mt-4 flex items-start gap-2 text-sm text-ink-700">
+          <input type="checkbox" x-model="shareLocation" class="mt-0.5 rounded border-ink-300 text-ink focus:ring-marigold">
+          <span>Share my live location with the host on arrival day so they're ready when I get there</span>
+        </label>
+        {% endif %}
+        <p class="error-text" x-show="error" x-text="error"></p>
+        {% if user.is_authenticated and user.is_owner %}
+          <p class="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">You're signed in as a host. Use a traveller account to book stays.</p>
+        {% else %}
+          <button class="btn-accent mt-4 w-full py-3 text-base" @click="book()" :disabled="busy" x-text="buttonLabel"></button>
+          <p class="mt-2 text-center text-xs text-ink-500">You won't be charged until the next step.</p>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</div>
+{% endwith %}
+{{ property.lat|json_script:"p-lat" }}{{ property.lng|json_script:"p-lng" }}
+<script>
+function propertyPage() {
+  const params = new URLSearchParams(location.search);
+  return {
+    slug: "{{ property.slug }}", today: new Date().toISOString().slice(0, 10),
+    checkin: params.get("checkin") || "", checkout: params.get("checkout") || "", guests: Number(params.get("guests") || 1),
+    rooms: [], roomId: null, q: null, busy: false, error: "", shareLocation: false,
+    get selectedRoom() { return this.rooms.find((r) => r.id === this.roomId); },
+    get buttonLabel() {
+      if (this.busy) return "Holding your room…";
+      if (!this.checkin || !this.checkout) return "Add dates";
+      if (!this.roomId) return "Choose a room";
+      return {% if user.is_authenticated %}"Reserve"{% else %}"Sign in to reserve"{% endif %};
+    },
+    async init() {
+      const d = await Alcove.api(`/api/properties/${this.slug}/`);
+      this.rooms = d.rooms;
+      this.refresh();
+      const lat = JSON.parse(document.getElementById("p-lat").textContent), lng = JSON.parse(document.getElementById("p-lng").textContent);
+      const boot = () => {
+        if (!window.L || !window.AlcoveMap) return setTimeout(boot, 50);
+        const map = AlcoveMap.create(this.$refs.map, { lat, lng, zoom: 15 });
+        map.scrollWheelZoom.disable();
+        L.marker([lat, lng], { icon: AlcoveMap.homeIcon() }).addTo(map);
+      };
+      boot();
+    },
+    async refresh() {
+      this.q = null; this.error = "";
+      if (!(this.checkin && this.checkout)) return;
+      try {
+        const d = await Alcove.api(`/api/properties/${this.slug}/availability/?checkin=${this.checkin}&checkout=${this.checkout}`);
+        this.rooms = d.rooms;
+        if (this.selectedRoom && this.selectedRoom.available === 0) this.roomId = null;
+        if (!this.roomId) { const first = this.rooms.find((r) => r.available > 0 && r.max_guests >= this.guests); if (first) this.roomId = first.id; }
+        this.quote();
+      } catch (e) { this.error = e.message; }
+    },
+    async quote() {
+      if (!(this.roomId && this.checkin && this.checkout)) return;
+      try { this.q = await Alcove.api(`/api/bookings/quote/?room_id=${this.roomId}&check_in=${this.checkin}&check_out=${this.checkout}`); }
+      catch (e) { this.error = e.message; }
+    },
+    async book() {
+      if (!this.checkin || !this.checkout || !this.roomId) { this.error = !this.roomId && this.checkin && this.checkout ? "Choose a room to continue." : "Add your check-in and check-out dates."; return; }
+      {% if not user.is_authenticated %}
+      location.href = "{% url 'login' %}?next=" + encodeURIComponent(location.pathname + `?checkin=${this.checkin}&checkout=${this.checkout}&guests=${this.guests}`);
+      return;
+      {% endif %}
+      this.busy = true; this.error = "";
+      try {
+        const b = await Alcove.api("/api/bookings/", { method: "POST", body: {
+          room_id: this.roomId, check_in: this.checkin, check_out: this.checkout, guests: this.guests, share_location: this.shareLocation,
+        } });
+        location.href = b.checkout_url;
+      } catch (e) { this.error = e.message; this.busy = false; this.refresh(); }
+    },
+  };
+}
+</script>
+{% endblock %}

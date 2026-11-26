@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Find a stay · Alcove{% endblock %}
+{% block head %}{% include "partials/leaflet.html" %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<div x-data="searchPage()" class="flex h-[calc(100vh-4rem)] flex-col">
+  <!-- filter bar -->
+  <form @submit.prevent="search()" class="border-b border-ink-100 bg-white">
+    <div class="mx-auto flex max-w-[100rem] flex-wrap items-end gap-2 px-4 py-3 sm:px-6">
+      <label class="min-w-[12rem] flex-1">
+        <span class="sr-only">Where</span>
+        <input x-model="f.q" class="field" placeholder="City, area or property name">
+      </label>
+      <label><span class="sr-only">Check in</span><input type="date" x-model="f.checkin" :min="today" class="field w-40" aria-label="Check in"></label>
+      <label><span class="sr-only">Check out</span><input type="date" x-model="f.checkout" :min="f.checkin || today" class="field w-40" aria-label="Check out"></label>
+      <label><span class="sr-only">Guests</span>
+        <select x-model.number="f.guests" class="field w-28" aria-label="Guests">
+          <template x-for="n in 8"><option :value="n" x-text="n + (n === 1 ? ' guest' : ' guests')"></option></template>
+        </select>
+      </label>
+      <button class="btn-primary">Search</button>
+      <button type="button" @click="filtersOpen = !filtersOpen" class="btn-ghost" :aria-expanded="filtersOpen">
+        Filters <span x-show="activeFilterCount" class="chip bg-marigold text-ink" x-text="activeFilterCount"></span>
+      </button>
+      <button type="button" @click="toggleLive()" class="btn-ghost" :class="live && 'border-jade text-jade'">
+        <span class="h-2.5 w-2.5 rounded-full" :class="live ? 'bg-jade ring-4 ring-jade/20 animate-pulse' : 'bg-ink-300'"></span>
+        <span x-text="live ? 'Live: near me' : 'Near me'"></span>
+      </button>
+    </div>
+    <div x-show="filtersOpen" x-cloak x-transition class="mx-auto grid max-w-[100rem] gap-6 border-t border-ink-100 px-4 py-4 sm:px-6 md:grid-cols-4">
+      <div>
+        <p class="label">Price per night (₹)</p>
+        <div class="flex gap-2"><input type="number" min="0" x-model="f.min_price" class="field" placeholder="Min"><input type="number" min="0" x-model="f.max_price" class="field" placeholder="Max"></div>
+      </div>
+      <div>
+        <label class="label" for="ptype">Type of place</label>
+        <select id="ptype" x-model="f.property_type" class="field">
+          <option value="">Any</option>
+          {% for v, l in types %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+        </select>
+      </div>
+      <div x-show="center">
+        <label class="label" for="radius">Within <span x-text="f.radius_km"></span> km</label>
+        <input id="radius" type="range" min="1" max="100" x-model.number="f.radius_km" @change="search()" class="w-full accent-ink">
+      </div>
+      <div class="md:col-span-4">
+        <p class="label">Amenities</p>
+        <div class="flex flex-wrap gap-2">
+          {% for a in amenities %}
+          <label class="chip cursor-pointer border py-1.5" :class="f.amenities.includes({{ a.id }}) ? 'border-ink bg-ink text-white' : 'border-ink-100 bg-white'">
+            <input type="checkbox" class="sr-only" value="{{ a.id }}" @change="toggleAmenity({{ a.id }})">{{ a.name }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="flex gap-2 md:col-span-4">
+        <button type="submit" class="btn-primary">Show stays</button>
+        <button type="button" class="btn-ghost" @click="clearFilters()">Clear filters</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <!-- results -->
+    <section class="min-h-0 overflow-y-auto px-4 py-5 sm:px-6" :class="showMapMobile && 'hidden lg:block'">
+      <div class="flex items-baseline justify-between">
+        <h1 class="text-2xl font-extrabold" x-text="heading"></h1>
+        <span class="text-sm text-ink-500" x-show="locMessage" x-text="locMessage"></span>
+      </div>
+      <p class="error-text" x-show="error" x-text="error"></p>
+      <div x-show="loading" class="mt-6 grid gap-6 sm:grid-cols-2">
+        <template x-for="i in 4"><div class="h-72 animate-pulse rounded-2xl bg-ink-50"></div></template>
+      </div>
+      <div x-show="!loading && !results.length" x-cloak class="mt-10 rounded-2xl border border-dashed border-ink-100 p-10 text-center">
+        <p class="font-semibold">No stays match these filters.</p>
+        <p class="mt-1 text-sm text-ink-500">Widen the radius, change the dates, or clear filters to see more.</p>
+        <button class="btn-ghost mt-4" @click="clearFilters()">Clear filters</button>
+      </div>
+      <div x-show="!loading" class="mt-5 grid gap-x-5 gap-y-8 sm:grid-cols-2">
+        <template x-for="p in results" :key="p.id">
+          <a :href="p.url + qs()" class="group block" @mouseenter="highlight(p.id)" @mouseleave="highlight(null)">
+            <div class="arch aspect-[4/5] bg-ink-50">
+              <img x-show="p.cover_url" :src="p.cover_url" :alt="p.name" loading="lazy" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]">
+            </div>
+            <div class="mt-3 flex justify-between gap-2">
+              <div class="min-w-0">
+                <p class="truncate font-semibold" x-text="p.name"></p>
+                <p class="text-sm text-ink-500"><span x-text="p.type_label"></span> in <span x-text="p.city"></span><template x-if="p.distance_km != null"><span> · <span x-text="p.distance_km"></span> km away</span></template></p>
+              </div>
+              <span x-show="p.rating" class="shrink-0 text-sm font-semibold" x-text="'★ ' + Number(p.rating).toFixed(1)"></span>
+            </div>
+            <p class="mt-1 text-sm" x-show="p.starting_price"><span class="font-semibold" x-text="Alcove.money(p.starting_price)"></span> <span class="text-ink-500">a night</span></p>
+          </a>
+        </template>
+      </div>
+    </section>
+    <!-- map -->
+    <section class="relative min-h-[50vh] border-l border-ink-100" :class="!showMapMobile && 'hidden lg:block'">
+      <div x-ref="map" class="absolute inset-0"></div>
+    </section>
+  </div>
+  <button @click="showMapMobile = !showMapMobile; $nextTick(() => map && map.invalidateSize())" class="btn-primary fixed bottom-5 left-1/2 z-30 -translate-x-1/2 shadow-lg lg:hidden" x-text="showMapMobile ? 'Show list' : 'Show map'"></button>
+</div>
+<script>
+function searchPage() {
+  const params = new URLSearchParams(location.search);
+  return {
+    today: new Date().toISOString().slice(0, 10),
+    f: {
+      q: params.get("q") || "", checkin: params.get("checkin") || "", checkout: params.get("checkout") || "",
+      guests: Number(params.get("guests") || 1), min_price: "", max_price: "", property_type: "", amenities: [], radius_km: 15,
+    },
+    results: [], loading: true, error: "", filtersOpen: false, showMapMobile: false,
+    map: null, layer: null, markers: {}, me: null, center: null, live: false, ll: null, locMessage: "", lastSearchAt: null,
+
+    get activeFilterCount() { return [this.f.min_price, this.f.max_price, this.f.property_type].filter(Boolean).length + this.f.amenities.length; },
+    get heading() {
+      if (this.loading) return "Searching…";
+      const n = this.results.length;
+      return `${n} ${n === 1 ? "stay" : "stays"}${this.center ? " near you" : this.f.q ? " for “" + this.f.q + "”" : ""}`;
+    },
+    qs() { return this.f.checkin && this.f.checkout ? `?checkin=${this.f.checkin}&checkout=${this.f.checkout}&guests=${this.f.guests}` : ""; },
+
+    init() {
+      const boot = () => {
+        if (!window.L || !window.AlcoveMap) return setTimeout(boot, 50);
+        this.map = AlcoveMap.create(this.$refs.map);
+        this.layer = L.layerGroup().addTo(this.map);
+        if (params.get("near") === "me") this.toggleLive(); else this.search();
+      };
+      boot();
+    },
+    toggleAmenity(id) { const i = this.f.amenities.indexOf(id); i >= 0 ? this.f.amenities.splice(i, 1) : this.f.amenities.push(id); },
+    clearFilters() { Object.assign(this.f, { min_price: "", max_price: "", property_type: "", amenities: [] }); this.search(); },
+
+    async search() {
+      this.loading = true; this.error = "";
+      const p = new URLSearchParams();
+      for (const [k, v] of Object.entries(this.f)) {
+        if (k === "amenities") v.forEach((a) => p.append("amenities", a));
+        else if (k === "radius_km") { if (this.center) p.set(k, v); }
+        else if (v !== "" && v != null) p.set(k, v);
+      }
+      if (this.center) { p.set("lat", this.center.lat); p.set("lng", this.center.lng); p.delete("q"); }
+      try {
+        const d = await Alcove.api("/api/properties/search/?" + p.toString());
+        this.results = d.results; this.plot(!this.live);
+        this.lastSearchAt = this.center;
+      } catch (e) { this.error = e.message; this.results = []; }
+      finally { this.loading = false; }
+    },
+
+    plot(fit) {
+      this.layer.clearLayers(); this.markers = {};
+      this.results.forEach((p) => {
+        const m = L.marker([p.lat, p.lng], { icon: AlcoveMap.pricePin(Alcove.money(p.starting_price)) })
+          .bindPopup(`<a href="${p.url}${this.qs()}"><b>${p.name}</b><br>${p.city} · ${Alcove.money(p.starting_price)}/night</a>`)
+          .addTo(this.layer);
+        this.markers[p.id] = m;
+      });
+      if (fit && this.results.length) this.map.fitBounds(L.latLngBounds(this.results.map((p) => [p.lat, p.lng])).pad(0.2), { maxZoom: 14 });
+    },
+    highlight(id) {
+      Object.entries(this.markers).forEach(([pid, m]) => {
+        const p = this.results.find((r) => r.id == pid);
+        m.setIcon(AlcoveMap.pricePin(Alcove.money(p.starting_price), pid == id));
+        if (pid == id) m.setZIndexOffset(1000); else m.setZIndexOffset(0);
+      });
+    },
+
+    toggleLive() {
+      if (this.live) {
+        this.ll && this.ll.stop(); this.live = false; this.center = null; this.locMessage = "";
+        if (this.me) { this.map.removeLayer(this.me); this.me = null; }
+        return this.search();
+      }
+      this.locMessage = "Finding you…";
+      const usesFilters = () => this.f.checkin || this.activeFilterCount || this.f.guests > 1;
+      this.ll = this.ll || liveLocation({
+        radius: () => this.f.radius_km,
+        onNearby: (m) => {
+          // No date/price filters: the live socket's Redis GEO results are enough.
+          if (!usesFilters()) { this.results = m.results; this.loading = false; this.plot(false); }
+          else if (!this.lastSearchAt || distanceKm(this.lastSearchAt, this.center) > 0.3) this.search();
+        },
+        onError: (msg) => { this.locMessage = msg; this.live = false; this.loading = false; },
+      });
+      let first = true;
+      this.ll.start((pos) => {
+        this.live = true; this.center = pos;
+        this.locMessage = `Location accurate to ${Math.round(pos.accuracy)} m`;
+        if (!this.me) this.me = L.marker([pos.lat, pos.lng], { icon: AlcoveMap.meIcon(), zIndexOffset: 2000 }).addTo(this.map);
+        this.me.setLatLng([pos.lat, pos.lng]);
+        if (first) { this.map.setView([pos.lat, pos.lng], 12); first = false; if (usesFilters()) this.search(); }
+      });
+    },
+  };
+}
+function distanceKm(a, b) {
+  if (!a || !b) return Infinity;
+  const R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+Hi {{ name }},
+
+Your Alcove code is {{ code }}
+
+{% if purpose == "login" %}Use it to finish signing in.{% elif purpose == "verify_email" %}Use it to verify your email address.{% else %}Use it to reset your password.{% endif %} It expires in 5 minutes.
+
+If you didn't request this, you can ignore this email — your account is safe.
+
+— Alcove

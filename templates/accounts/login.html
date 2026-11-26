@@ -1,0 +1,27 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block title %}Sign in · Alcove{% endblock %}
+{% block form %}
+<div x-data="authFlow('login')">
+  <div x-show="step === 'credentials'">
+    <h1 class="text-3xl font-extrabold">Welcome back</h1>
+    <p class="mt-2 text-ink-500">Sign in with your email and password. We'll email you a code to confirm it's you.</p>
+    <form class="mt-6 space-y-4" @submit.prevent="submitCredentials()">
+      <div>
+        <label class="label" for="email">Email</label>
+        <input id="email" type="email" class="field" x-model="form.email" autocomplete="email" required autofocus>
+      </div>
+      <div>
+        <div class="flex items-baseline justify-between">
+          <label class="label" for="password">Password</label>
+          <a href="{% url 'forgot_password' %}" class="text-sm text-ink-500 hover:text-ink">Forgot password?</a>
+        </div>
+        <input id="password" type="password" class="field" x-model="form.password" autocomplete="current-password" required>
+      </div>
+      <p class="error-text" x-show="error" x-text="error"></p>
+      <button class="btn-primary w-full" :disabled="busy" x-text="busy ? 'Sending code…' : 'Continue'"></button>
+    </form>
+    <p class="mt-6 text-center text-sm text-ink-500">New to Alcove? <a href="{% url 'register' %}" class="link">Create an account</a></p>
+  </div>
+  {% include "accounts/_otp_step.html" with verify_label="Verify and sign in" %}
+</div>
+{% endblock %}

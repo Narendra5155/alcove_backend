@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Alcove · Rooms and stays near you{% endblock %}
+{% block head %}{% include "partials/leaflet.html" %}{% endblock %}
+{% block content %}
+<section class="mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-10 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:pt-16">
+  <div>
+    <h1 class="text-5xl font-extrabold leading-[1.02] sm:text-6xl lg:text-7xl">A room for tonight, a few streets away.</h1>
+    <p class="mt-5 max-w-lg text-lg text-ink-500">Search hotels, homestays and apartments by where you are right now, see live prices, and pay securely in a minute.</p>
+
+    <form action="{% url 'search' %}" method="get" class="mt-8 grid gap-2 rounded-2xl border border-ink-100 bg-white p-2 sm:grid-cols-[1.4fr_1fr_1fr_auto]">
+      <label class="rounded-xl px-3 py-2 hover:bg-paper">
+        <span class="block text-xs font-semibold text-ink-500">Where</span>
+        <input name="q" placeholder="City, area or property" class="w-full border-0 bg-transparent p-0 text-sm focus:ring-0">
+      </label>
+      <label class="rounded-xl px-3 py-2 hover:bg-paper">
+        <span class="block text-xs font-semibold text-ink-500">Check in</span>
+        <input type="date" name="checkin" class="w-full border-0 bg-transparent p-0 text-sm focus:ring-0" min="{% now 'Y-m-d' %}">
+      </label>
+      <label class="rounded-xl px-3 py-2 hover:bg-paper">
+        <span class="block text-xs font-semibold text-ink-500">Check out</span>
+        <input type="date" name="checkout" class="w-full border-0 bg-transparent p-0 text-sm focus:ring-0" min="{% now 'Y-m-d' %}">
+      </label>
+      <button class="btn-primary h-full px-6">Search</button>
+    </form>
+    <a href="{% url 'search' %}?near=me" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-ink-700 hover:text-ink">
+      <span class="h-2.5 w-2.5 rounded-full bg-jade ring-4 ring-jade/20"></span> Show stays around my location
+    </a>
+  </div>
+
+  <div class="relative" x-data="heroMap()">
+    <div class="arch aspect-[5/6] border border-ink-100 bg-ink-50 lg:aspect-[4/5]">
+      <div x-ref="map" class="h-full w-full"></div>
+    </div>
+    <div class="absolute bottom-5 left-5 right-5 rounded-2xl border border-ink-100 bg-white/95 p-4 backdrop-blur">
+      <p class="text-sm font-semibold" x-text="status"></p>
+      <button x-show="!live" @click="goLive()" class="mt-2 btn-accent text-sm">Use my location</button>
+    </div>
+  </div>
+</section>
+
+{% if featured %}
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+  <div class="flex items-end justify-between">
+    <h2 class="text-3xl font-extrabold">Recently listed</h2>
+    <a href="{% url 'search' %}" class="link text-sm">Browse all stays</a>
+  </div>
+  <div class="mt-6 grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
+    {% for p in featured %}{% include "partials/property_card.html" %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="mx-auto mt-10 max-w-7xl px-4 sm:px-6">
+  <div class="grid gap-8 rounded-3xl bg-ink p-8 text-white sm:p-12 lg:grid-cols-[1.3fr_1fr] lg:items-center">
+    <div>
+      <h2 class="text-4xl font-extrabold text-white">Have rooms to fill?</h2>
+      <p class="mt-3 max-w-xl text-ink-100">List your hotel, homestay or apartment, take payments online, and track bookings, check-ins and earnings from one dashboard. Arriving guests can share their live location with you.</p>
+    </div>
+    <div class="lg:text-right"><a href="{% url 'register' %}?role=owner" class="btn-accent px-6 py-3 text-base">Start hosting</a></div>
+  </div>
+</section>
+<script>
+function heroMap() {
+  return {
+    map: null, layer: null, me: null, live: false, status: "Stays across India",
+    init() {
+      const boot = () => {
+        if (!window.L || !window.AlcoveMap) return setTimeout(boot, 50);
+        this.map = AlcoveMap.create(this.$refs.map, { lat: 20.59, lng: 78.96, zoom: 4 });
+        this.layer = L.layerGroup().addTo(this.map);
+        Alcove.api("/api/properties/search/").then((d) => this.plot(d.results, false));
+      };
+      boot();
+    },
+    plot(list, fit) {
+      this.layer.clearLayers();
+      list.forEach((p) => L.marker([p.lat, p.lng], { icon: AlcoveMap.pricePin(Alcove.money(p.starting_price)) })
+        .bindPopup(`<a href="${p.url}"><b>${p.name}</b><br>${p.city}</a>`).addTo(this.layer));
+      if (fit && list.length) this.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lng])).pad(0.3));
+    },
+    goLive() {
+      this.status = "Finding you…";
+      const ll = liveLocation({
+        radius: () => 25,
+        onNearby: (m) => {
+          this.status = m.results.length ? `${m.results.length} stays within 25 km of you` : "No stays within 25 km yet. Try searching a city.";
+          this.plot(m.results, false);
+        },
+        onError: (msg) => (this.status = msg),
+      });
+      let centered = false;
+      ll.start((pos) => {
+        this.live = true;
+        if (!this.me) this.me = L.marker([pos.lat, pos.lng], { icon: AlcoveMap.meIcon() }).addTo(this.map);
+        this.me.setLatLng([pos.lat, pos.lng]);
+        if (!centered) { this.map.setView([pos.lat, pos.lng], 12); centered = true; }
+      });
+    },
+  };
+}
+</script>
+{% endblock %}

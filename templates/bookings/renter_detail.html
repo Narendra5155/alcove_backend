@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Booking {{ booking.reference }} · Alcove{% endblock %}
+{% block head %}{% include "partials/leaflet.html" %}{% endblock %}
+{% block content %}
+<div class="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_24rem]" x-data="renterBooking()">
+  <section class="min-w-0">
+    <a href="{% url 'dashboard' %}" class="text-sm text-ink-500 hover:text-ink">My trips</a>
+    {% if request.GET.paid and booking.status == 'CONFIRMED' %}
+      <h1 class="mt-2 text-4xl font-extrabold">You're booked.</h1>
+      <p class="mt-2 text-ink-500">We've let {{ booking.property.owner.first_name }} know you're coming. A receipt is below.</p>
+    {% else %}
+      <h1 class="mt-2 text-4xl font-extrabold">{{ booking.property.name }}</h1>
+    {% endif %}
+    <div class="mt-3">{% include "partials/status.html" with b=booking %}</div>
+
+    {% if booking.status == 'PENDING' %}
+      <a href="{% url 'checkout' booking.reference %}" class="btn-accent mt-6">Complete payment</a>
+    {% endif %}
+
+    {% if booking.status == 'CONFIRMED' %}
+    <div class="panel mt-6 p-5">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold">Live location on arrival day</h2>
+          <p class="mt-1 text-sm text-ink-500">{% if booking.is_arrival_day %}When on, your host sees where you are until you check in.{% else %}On {{ booking.check_in|date:"j M" }}, your host will see where you are until you check in.{% endif %}</p>
+        </div>
+        <button role="switch" :aria-checked="sharing" @click="toggleShare()" class="relative h-7 w-12 shrink-0 rounded-full transition-colors" :class="sharing ? 'bg-jade' : 'bg-ink-100'">
+          <span class="absolute top-1 h-5 w-5 rounded-full bg-white transition-all" :class="sharing ? 'left-6' : 'left-1'"></span>
+        </button>
+      </div>
+      {% if booking.is_arrival_day %}
+      <div x-show="sharing" x-cloak class="mt-4">
+        <p class="text-sm" :class="locError ? 'text-rose' : 'text-jade'" x-text="locError || status"></p>
+        <div x-ref="map" class="mt-3 h-64 overflow-hidden rounded-xl border border-ink-100"></div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="panel mt-6 p-5">
+      <h2 class="text-xl font-bold">Your host</h2>
+      <div class="mt-3 flex items-center gap-3">
+        {% include "partials/avatar.html" with u=booking.property.owner size="h-12 w-12" %}
+        <div><p class="font-semibold">{{ booking.property.owner.full_name }}</p>
+          {% if booking.status == 'CONFIRMED' or booking.status == 'CHECKED_IN' %}<p class="text-sm text-ink-500">{{ booking.property.owner.email }}{% if booking.property.owner.profile.phone %} · {{ booking.property.owner.profile.phone }}{% endif %}</p>{% endif %}
+        </div>
+      </div>
+      <p class="mt-3 text-sm text-ink-500">{{ booking.property.address }}, {{ booking.property.city }} · <a class="link" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat={{ booking.property.lat }}&mlon={{ booking.property.lng }}#map=16/{{ booking.property.lat }}/{{ booking.property.lng }}">Open in map</a></p>
+    </div>
+
+    {% if booking.status == 'COMPLETED' %}
+    <div class="panel mt-6 p-5">
+      {% if review %}
+        <h2 class="text-xl font-bold">Your review</h2>
+        <p class="mt-2 font-semibold text-marigold-700">{% for _ in "12345"|make_list|slice:review.rating %}★{% endfor %}</p>
+        <p class="mt-1 text-ink-700">{{ review.comment }}</p>
+      {% else %}
+        <div x-data="{ rating: 0, comment: '', done: false, err: '' }">
+          <template x-if="!done"><form @submit.prevent="Alcove.api('/api/bookings/{{ booking.reference }}/review/', { method: 'POST', body: { rating, comment } }).then(() => done = true).catch(e => err = e.message)">
+            <h2 class="text-xl font-bold">How was your stay?</h2>
+            <div class="mt-3 flex gap-1" role="radiogroup" aria-label="Rating">
+              <template x-for="n in 5"><button type="button" class="text-3xl" :class="n <= rating ? 'text-marigold' : 'text-ink-100'" @click="rating = n" :aria-label="n + ' stars'">★</button></template>
+            </div>
+            <textarea x-model="comment" rows="3" maxlength="1000" class="field mt-3" placeholder="What should other travellers know?"></textarea>
+            <p class="error-text" x-text="err"></p>
+            <button class="btn-primary mt-3" :disabled="!rating">Post review</button>
+          </form></template>
+          <p x-show="done" class="font-semibold text-jade">Thanks, your review is live.</p>
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if booking.status == 'PENDING' or booking.status == 'CONFIRMED' %}
+    <div class="mt-6" x-data="{ open: false, reason: '' }">
+      <button class="text-sm font-medium text-rose hover:underline" @click="open = true" x-show="!open">Cancel this booking</button>
+      <div x-show="open" x-cloak class="panel p-5">
+        <p class="font-semibold">Cancel booking {{ booking.reference }}?</p>
+        <p class="mt-1 text-sm text-ink-500">{% if booking.status == 'CONFIRMED' %}You'll get a full refund of ₹{{ booking.total|floatformat:2 }} to your original payment method.{% else %}Your room hold will be released.{% endif %}</p>
+        <input x-model="reason" class="field mt-3" placeholder="Reason (optional)">
+        <div class="mt-3 flex gap-2">
+          <button class="btn-danger" @click="Alcove.api('/api/bookings/{{ booking.reference }}/cancel/', { method: 'POST', body: { reason } }).then(() => location.reload()).catch(e => $store.toasts.push({ title: e.message, kind: 'error' }))">Cancel booking</button>
+          <button class="btn-ghost" @click="open = false">Keep booking</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  <aside class="space-y-6">
+    {% include "bookings/_summary.html" %}
+    {% with payments=booking.payments.all %}{% if payments %}
+    <div class="panel p-5">
+      <h2 class="font-display text-lg font-bold">Payments</h2>
+      <ul class="mt-3 space-y-3 text-sm">
+        {% for p in payments %}
+        <li class="flex justify-between gap-2">
+          <div><p class="font-medium">{{ p.get_status_display }}{% if p.is_demo %} (test){% endif %}</p><p class="text-xs text-ink-500">{{ p.provider_payment_id|default:p.provider_order_id }}</p></div>
+          <span>₹{{ p.amount|floatformat:2 }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}{% endwith %}
+  </aside>
+</div>
+<script>
+function renterBooking() {
+  return {
+    sharing: {{ booking.share_location|yesno:"true,false" }}, arrival: {{ booking.is_arrival_day|yesno:"true,false" }},
+    status: "Sharing your location with your host", locError: "", ll: null, map: null, me: null,
+    init() { if (this.sharing && this.arrival) this.$nextTick(() => this.startSharing()); },
+    async toggleShare() {
+      try {
+        const d = await Alcove.api("/api/bookings/{{ booking.reference }}/share-location/", { method: "POST", body: { enabled: !this.sharing } });
+        this.sharing = d.share_location;
+        if (this.arrival) this.sharing ? this.$nextTick(() => this.startSharing()) : this.stopSharing();
+        Alpine.store("toasts").push({ title: this.sharing ? "Location sharing on" : "Location sharing off", kind: "success" });
+      } catch (e) { Alpine.store("toasts").push({ title: e.message, kind: "error" }); }
+    },
+    startSharing() {
+      const boot = () => {
+        if (!window.L || !window.AlcoveMap) return setTimeout(boot, 50);
+        if (!this.map) {
+          this.map = AlcoveMap.create(this.$refs.map, { lat: {{ booking.property.lat }}, lng: {{ booking.property.lng }}, zoom: 13 });
+          L.marker([{{ booking.property.lat }}, {{ booking.property.lng }}], { icon: AlcoveMap.homeIcon() }).addTo(this.map);
+        }
+        this.ll = liveLocation({ radius: () => 2, onError: (m) => (this.locError = m) });
+        this.ll.start((pos) => {
+          this.locError = "";
+          if (!this.me) this.me = L.marker([pos.lat, pos.lng], { icon: AlcoveMap.meIcon() }).addTo(this.map);
+          this.me.setLatLng([pos.lat, pos.lng]);
+          this.map.fitBounds(L.latLngBounds([[pos.lat, pos.lng], [{{ booking.property.lat }}, {{ booking.property.lng }}]]).pad(0.3));
+        });
+      };
+      boot();
+    },
+    stopSharing() { this.ll && this.ll.stop(); this.ll && this.ll.socket.close(); this.ll = null; },
+  };
+}
+</script>
+{% endblock %}

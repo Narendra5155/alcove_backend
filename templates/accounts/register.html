@@ -1,0 +1,44 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block title %}Create your account · Alcove{% endblock %}
+{% block aside %}Travellers find rooms near them. Hosts fill rooms without the back-and-forth.{% endblock %}
+{% block form %}
+<div x-data="authFlow('register', { role: '{{ role }}' })">
+  <div x-show="step === 'credentials'">
+    <h1 class="text-3xl font-extrabold">Create your account</h1>
+    <form class="mt-6 space-y-4" @submit.prevent="submitCredentials()">
+      <fieldset>
+        <legend class="label">I want to</legend>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="cursor-pointer rounded-xl border p-3 text-sm" :class="form.role === 'RENTER' ? 'border-ink bg-ink-50' : 'border-ink-100'">
+            <input type="radio" value="RENTER" x-model="form.role" class="sr-only">
+            <span class="block font-semibold">Book stays</span><span class="text-ink-500">as a traveller</span>
+          </label>
+          <label class="cursor-pointer rounded-xl border p-3 text-sm" :class="form.role === 'OWNER' ? 'border-ink bg-ink-50' : 'border-ink-100'">
+            <input type="radio" value="OWNER" x-model="form.role" class="sr-only">
+            <span class="block font-semibold">Host guests</span><span class="text-ink-500">list my property</span>
+          </label>
+        </div>
+      </fieldset>
+      <div>
+        <label class="label" for="full_name">Full name</label>
+        <input id="full_name" class="field" x-model="form.full_name" autocomplete="name" required>
+        <p class="error-text" x-show="errors.full_name" x-text="errors.full_name && errors.full_name[0]"></p>
+      </div>
+      <div>
+        <label class="label" for="email">Email</label>
+        <input id="email" type="email" class="field" x-model="form.email" autocomplete="email" required>
+        <p class="error-text" x-show="errors.email" x-text="errors.email && errors.email[0]"></p>
+      </div>
+      <div>
+        <label class="label" for="password">Password</label>
+        <input id="password" type="password" class="field" x-model="form.password" autocomplete="new-password" minlength="8" required>
+        <p class="mt-1 text-xs text-ink-500">At least 8 characters, not just numbers.</p>
+      </div>
+      <p class="error-text" x-show="error && !errors.email && !errors.full_name" x-text="error"></p>
+      <button class="btn-primary w-full" :disabled="busy" x-text="busy ? 'Creating account…' : 'Create account'"></button>
+    </form>
+    <p class="mt-6 text-center text-sm text-ink-500">Already have an account? <a href="{% url 'login' %}" class="link">Sign in</a></p>
+  </div>
+  {% include "accounts/_otp_step.html" with verify_label="Verify email" %}
+</div>
+{% endblock %}

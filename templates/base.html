@@ -1,0 +1,25 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Alcove{% endblock %}</title>
+  <meta name="description" content="{% block description %}Find and book rooms, homestays and hotels near you with Alcove.{% endblock %}">
+  <link rel="icon" href="{% static 'img/logo.svg' %}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block head %}{% endblock %}
+  <script defer src="{% static 'js/app.js' %}"></script>
+  {% block scripts %}{% endblock %}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen flex flex-col" data-tiles="{{ MAP_TILE_URL }}" data-tiles-attribution="{{ MAP_TILE_ATTRIBUTION }}" {% if user.is_authenticated %}data-auth="1" data-role="{{ user.role }}"{% endif %}
+      x-data x-init="$store.notifs.init()">
+  {% include "partials/nav.html" %}
+  <main class="flex-1">{% block content %}{% endblock %}</main>
+  {% block footer %}{% include "partials/footer.html" %}{% endblock %}
+  {% include "partials/toasts.html" %}
+</body>
+</html>

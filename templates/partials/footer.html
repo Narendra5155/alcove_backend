@@ -1,0 +1,9 @@
+<footer class="mt-16 border-t border-ink-100 bg-white">
+  <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-ink-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+    <p>© {% now "Y" %} Alcove. Rooms, homestays and hotels across India.</p>
+    <div class="flex gap-4">
+      <a href="{% url 'search' %}" class="hover:text-ink">Find a stay</a>
+      <a href="{% url 'register' %}?role=owner" class="hover:text-ink">Host with Alcove</a>
+    </div>
+  </div>
+</footer>

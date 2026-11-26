@@ -1,0 +1,18 @@
+<div class="overflow-x-auto">
+<table class="w-full min-w-[44rem] text-left text-sm">
+  <thead class="border-y border-ink-100 bg-paper text-ink-500">
+    <tr><th class="px-5 py-2.5 font-medium">Guest</th><th class="px-3 py-2.5 font-medium">Stay</th><th class="px-3 py-2.5 font-medium">Dates</th><th class="px-3 py-2.5 font-medium">Payout</th><th class="px-5 py-2.5 font-medium">Status</th></tr>
+  </thead>
+  <tbody class="divide-y divide-ink-100">
+    {% for b in rows %}
+    <tr class="hover:bg-paper">
+      <td class="px-5 py-3"><a href="{% url 'owner_booking_detail' b.reference %}" class="font-semibold hover:underline">{{ b.renter.full_name }}</a><p class="text-xs text-ink-500">{{ b.reference }}</p></td>
+      <td class="px-3 py-3">{{ b.property.name }}<p class="text-xs text-ink-500">{{ b.room.name }}</p></td>
+      <td class="px-3 py-3">{{ b.check_in|date:"j M" }} – {{ b.check_out|date:"j M" }}<p class="text-xs text-ink-500">{{ b.nights }} night{{ b.nights|pluralize }}</p></td>
+      <td class="px-3 py-3">₹{{ b.owner_payout|floatformat:0 }}</td>
+      <td class="px-5 py-3">{% include "partials/status.html" %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="px-5 py-8 text-center text-ink-500">No bookings yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>

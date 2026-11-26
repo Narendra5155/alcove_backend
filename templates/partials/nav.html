@@ -1,0 +1,48 @@
+<header class="sticky top-0 z-40 border-b border-ink-100 bg-white/95 backdrop-blur">
+  <nav class="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
+    {% include "partials/logo.html" %}
+    <div class="ml-6 hidden items-center gap-1 md:flex">
+      <a href="{% url 'search' %}" class="nav-link {% if request.resolver_match.url_name == 'search' %}nav-link-active{% endif %}">Find a stay</a>
+      {% if user.is_authenticated and user.is_owner %}
+        <a href="{% url 'owner_dashboard' %}" class="nav-link {% if 'owner' in request.resolver_match.url_name %}nav-link-active{% endif %}">Host dashboard</a>
+      {% elif user.is_authenticated %}
+        <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}nav-link-active{% endif %}">My trips</a>
+      {% endif %}
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      {% if user.is_authenticated %}
+        {% if user.is_renter %}<a href="{% url 'profile' %}#hosting" class="nav-link hidden sm:inline-flex">List your property</a>{% endif %}
+        {% include "partials/bell.html" %}
+        <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+          <button @click="open = !open" class="flex items-center gap-2 rounded-full p-0.5 pr-2 hover:bg-ink-50" :aria-expanded="open" aria-label="Account menu">
+            {% include "partials/avatar.html" with u=user size="h-9 w-9" %}
+            <svg class="h-4 w-4 text-ink-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z"/></svg>
+          </button>
+          <div x-cloak x-show="open" x-transition.origin.top.right class="absolute right-0 mt-2 w-60 panel p-1.5 shadow-lg shadow-ink/5">
+            <div class="px-3 py-2">
+              <p class="text-sm font-semibold">{{ user.full_name }}</p>
+              <p class="truncate text-xs text-ink-500">{{ user.email }}</p>
+            </div>
+            <hr class="my-1 border-ink-100">
+            {% if user.is_owner %}
+              <a href="{% url 'owner_dashboard' %}" class="nav-link block">Overview</a>
+              <a href="{% url 'owner_properties' %}" class="nav-link block">My properties</a>
+              <a href="{% url 'owner_bookings' %}" class="nav-link block">Bookings</a>
+              <a href="{% url 'owner_earnings' %}" class="nav-link block">Earnings</a>
+            {% else %}
+              <a href="{% url 'dashboard' %}" class="nav-link block">My trips</a>
+            {% endif %}
+            <a href="{% url 'notifications' %}" class="nav-link block">Notifications</a>
+            <a href="{% url 'profile' %}" class="nav-link block">Profile</a>
+            <hr class="my-1 border-ink-100">
+            <button onclick="logout()" class="nav-link block w-full text-left text-rose">Sign out</button>
+          </div>
+        </div>
+      {% else %}
+        <a href="{% url 'register' %}?role=owner" class="nav-link hidden sm:inline-flex">List your property</a>
+        <a href="{% url 'login' %}" class="btn-ghost">Sign in</a>
+        <a href="{% url 'register' %}" class="btn-primary hidden sm:inline-flex">Create account</a>
+      {% endif %}
+    </div>
+  </nav>
+</header>

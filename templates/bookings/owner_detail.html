@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ booking.reference }} · Host · Alcove{% endblock %}
+{% block head %}{% include "partials/leaflet.html" %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-6xl px-4 py-10 sm:px-6" x-data="ownerBooking()">
+  <a href="{% url 'owner_bookings' %}" class="text-sm text-ink-500 hover:text-ink">Bookings</a>
+  <div class="mt-2 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      {% include "partials/avatar.html" with u=booking.renter size="h-14 w-14" %}
+      <div>
+        <h1 class="text-3xl font-extrabold">{{ booking.renter.full_name }}</h1>
+        <p class="text-ink-500">{{ booking.renter.email }}{% if booking.renter.profile.phone %} · {{ booking.renter.profile.phone }}{% endif %}</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {% include "partials/status.html" with b=booking %}
+      {% if booking.status == 'CONFIRMED' %}<button class="btn-primary" @click="act('check-in')" :disabled="busy">Check in guest</button>{% endif %}
+      {% if booking.status == 'CHECKED_IN' %}<button class="btn-primary" @click="act('check-out')" :disabled="busy">Check out guest</button>{% endif %}
+      {% if booking.status == 'CONFIRMED' or booking.status == 'PENDING' %}<button class="btn-danger" @click="if (confirm('Cancel this booking? The guest will be refunded in full.')) act('cancel')" :disabled="busy">Cancel and refund</button>{% endif %}
+    </div>
+  </div>
+
+  <div class="mt-8 grid gap-8 lg:grid-cols-[1fr_24rem]">
+    <section class="min-w-0 space-y-6">
+      {% if booking.status == 'CONFIRMED' %}
+      <div class="panel overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-2 p-5">
+          <div>
+            <h2 class="text-xl font-bold">Guest arrival</h2>
+            <p class="text-sm text-ink-500" x-text="arrivalText"></p>
+          </div>
+          <span x-show="live" class="chip bg-jade-50 text-jade"><span class="h-2 w-2 animate-pulse rounded-full bg-jade"></span> Live</span>
+        </div>
+        <div x-ref="map" class="h-80 border-t border-ink-100"></div>
+      </div>
+      {% endif %}
+      {% if booking.special_requests %}
+      <div class="panel p-5"><h2 class="text-xl font-bold">Special requests</h2><p class="mt-2 whitespace-pre-line text-ink-700">{{ booking.special_requests }}</p></div>
+      {% endif %}
+      <div class="panel p-5">
+        <h2 class="text-xl font-bold">Timeline</h2>
+        <ol class="mt-3 space-y-2 text-sm">
+          <li><span class="text-ink-500">Booked</span> {{ booking.created_at|date:"j M Y, g:i A" }}</li>
+          {% for p in booking.payments.all %}{% if p.paid_at %}<li><span class="text-ink-500">Paid</span> {{ p.paid_at|date:"j M Y, g:i A" }} · ₹{{ p.amount|floatformat:2 }}</li>{% endif %}{% if p.refunded_at %}<li><span class="text-ink-500">Refunded</span> {{ p.refunded_at|date:"j M Y, g:i A" }}</li>{% endif %}{% endfor %}
+          {% if booking.checked_in_at %}<li><span class="text-ink-500">Checked in</span> {{ booking.checked_in_at|date:"j M Y, g:i A" }}</li>{% endif %}
+          {% if booking.checked_out_at %}<li><span class="text-ink-500">Checked out</span> {{ booking.checked_out_at|date:"j M Y, g:i A" }}</li>{% endif %}
+          {% if booking.cancelled_at %}<li><span class="text-ink-500">Cancelled</span> {{ booking.cancelled_at|date:"j M Y, g:i A" }} · {{ booking.cancel_reason }}</li>{% endif %}
+        </ol>
+      </div>
+    </section>
+    <aside class="space-y-6">
+      {% include "bookings/_summary.html" %}
+      <div class="panel p-5 text-sm">
+        <div class="flex justify-between"><span class="text-ink-500">Room charges</span><span>₹{{ booking.subtotal|floatformat:2 }}</span></div>
+        <div class="mt-2 flex justify-between"><span class="text-ink-500">Platform fee</span><span>−₹{{ booking.platform_fee|floatformat:2 }}</span></div>
+        <div class="mt-2 flex justify-between border-t border-ink-100 pt-2 font-semibold"><span>Your payout</span><span>₹{{ booking.owner_payout|floatformat:2 }}</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+function ownerBooking() {
+  const home = [{{ booking.property.lat }}, {{ booking.property.lng }}];
+  return {
+    busy: false, live: false, map: null, guest: null, line: null,
+    arrivalText: "{% if booking.is_arrival_day %}{% if booking.share_location %}Waiting for the guest's location…{% else %}The guest hasn't turned on location sharing.{% endif %}{% else %}Arriving {{ booking.check_in|date:'D, j M' }}. If they share their location, you'll see them here that day.{% endif %}",
+    init() {
+      if (!this.$refs.map) return;
+      const boot = () => {
+        if (!window.L || !window.AlcoveMap) return setTimeout(boot, 50);
+        this.map = AlcoveMap.create(this.$refs.map, { lat: home[0], lng: home[1], zoom: 14 });
+        L.marker(home, { icon: AlcoveMap.homeIcon() }).addTo(this.map).bindTooltip("{{ booking.property.name|escapejs }}");
+        const ws = Alcove.socket("/ws/location/", {
+          onOpen: () => ws.send({ action: "watch_booking", reference: "{{ booking.reference }}" }),
+          onMessage: (m) => {
+            if (m.type === "watching" && m.last) this.show(m.last);
+            if (m.type === "guest_position") this.show(m);
+          },
+        });
+      };
+      boot();
+    },
+    show(p) {
+      this.live = true;
+      const pos = [p.lat, p.lng];
+      if (!this.guest) this.guest = L.marker(pos, { icon: AlcoveMap.meIcon() }).addTo(this.map).bindTooltip("{{ booking.renter.first_name|escapejs }}");
+      this.guest.setLatLng(pos);
+      if (this.line) this.map.removeLayer(this.line);
+      this.line = L.polyline([pos, home], { color: "#1B2A4A", weight: 2, dashArray: "6 6" }).addTo(this.map);
+      this.map.fitBounds(L.latLngBounds([pos, home]).pad(0.3));
+      this.arrivalText = p.distance_km != null ? `{{ booking.renter.first_name|escapejs }} is ${p.distance_km} km away (straight line) · updated ${new Date((p.ts || Date.now() / 1000) * 1000).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}` : "Guest location received";
+    },
+    async act(action) {
+      this.busy = true;
+      try {
+        await Alcove.api(`/api/owner/bookings/{{ booking.reference }}/${action}/`, { method: "POST", body: {} });
+        location.reload();
+      } catch (e) { Alpine.store("toasts").push({ title: e.message, kind: "error" }); this.busy = false; }
+    },
+  };
+}
+</script>
+{% endblock %}

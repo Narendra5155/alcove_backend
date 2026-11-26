@@ -1,0 +1,74 @@
+{% extends "dashboard/_owner_layout.html" %}
+{% block title %}Bookings · Host · Alcove{% endblock %}
+{% block dash %}
+<div x-data="ownerBookings()" x-init="load()" @alcove:notification.window="if (['new_booking','booking_cancelled','booking_expired'].includes($event.detail.verb)) load()">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <h1 class="text-3xl font-extrabold">Bookings</h1>
+    <div class="flex flex-wrap gap-2">
+      <input x-model="q" class="field w-56" placeholder="Search guest or reference" aria-label="Search bookings">
+      <select x-model="property" class="field w-48" aria-label="Property">
+        <option value="">All properties</option>
+        {% for p in properties %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="mt-5 flex gap-1 overflow-x-auto border-b border-ink-100" role="tablist">
+    <template x-for="t in tabs" :key="t.value">
+      <button role="tab" :aria-selected="status === t.value" @click="status = t.value; load()"
+              class="whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium" :class="status === t.value ? 'border-ink text-ink' : 'border-transparent text-ink-500 hover:text-ink'" x-text="t.label"></button>
+    </template>
+  </div>
+  <div class="panel mt-4 overflow-x-auto">
+    <table class="w-full min-w-[52rem] text-left text-sm">
+      <thead class="border-b border-ink-100 bg-paper text-ink-500">
+        <tr><th class="px-5 py-2.5 font-medium">Guest</th><th class="px-3 py-2.5 font-medium">Stay</th><th class="px-3 py-2.5 font-medium">Dates</th><th class="px-3 py-2.5 font-medium">Guest paid</th><th class="px-3 py-2.5 font-medium">Payout</th><th class="px-3 py-2.5 font-medium">Status</th><th class="px-5 py-2.5"><span class="sr-only">Actions</span></th></tr>
+      </thead>
+      <tbody class="divide-y divide-ink-100">
+        <template x-for="b in filtered" :key="b.reference">
+          <tr class="hover:bg-paper">
+            <td class="px-5 py-3"><a :href="`/dashboard/owner/bookings/${b.reference}/`" class="font-semibold hover:underline" x-text="b.renter_name"></a><p class="text-xs text-ink-500" x-text="b.reference"></p></td>
+            <td class="px-3 py-3"><span x-text="b.property_name"></span><p class="text-xs text-ink-500" x-text="b.room_name + ' · ' + b.guests + ' guest' + (b.guests > 1 ? 's' : '')"></p></td>
+            <td class="px-3 py-3"><span x-text="fmt(b.check_in) + ' – ' + fmt(b.check_out)"></span><p class="text-xs text-ink-500" x-text="b.nights + ' night' + (b.nights > 1 ? 's' : '')"></p></td>
+            <td class="px-3 py-3" x-text="Alcove.money(b.total)"></td>
+            <td class="px-3 py-3 font-semibold" x-text="Alcove.money(b.owner_payout)"></td>
+            <td class="px-3 py-3"><span class="chip" :class="'st-' + b.status" x-text="b.status_label"></span></td>
+            <td class="px-5 py-3 text-right">
+              <button x-show="b.status === 'CONFIRMED' && b.check_in <= today" class="btn-ghost px-3 py-1.5" @click="act(b, 'check-in')">Check in</button>
+              <button x-show="b.status === 'CHECKED_IN'" class="btn-ghost px-3 py-1.5" @click="act(b, 'check-out')">Check out</button>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="!loading && !filtered.length"><td colspan="7" class="px-5 py-10 text-center text-ink-500">No bookings here yet.</td></tr>
+        <tr x-show="loading"><td colspan="7" class="px-5 py-10 text-center text-ink-500">Loading bookings…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+function ownerBookings() {
+  return {
+    rows: [], loading: true, status: "", q: "", property: "", today: new Date().toISOString().slice(0, 10),
+    tabs: [{ value: "", label: "All" }, { value: "CONFIRMED", label: "Upcoming" }, { value: "CHECKED_IN", label: "In house" },
+           { value: "PENDING", label: "Awaiting payment" }, { value: "COMPLETED", label: "Completed" }, { value: "CANCELLED", label: "Cancelled" }],
+    get filtered() {
+      const q = this.q.trim().toLowerCase();
+      return this.rows.filter((b) => (!this.property || b.property_name === this.property) &&
+        (!q || b.renter_name.toLowerCase().includes(q) || b.reference.toLowerCase().includes(q) || b.renter_email.toLowerCase().includes(q)));
+    },
+    fmt(d) { return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" }); },
+    async load() {
+      this.loading = true;
+      const d = await Alcove.api("/api/bookings/mine/" + (this.status ? `?status=${this.status}` : ""));
+      this.rows = d.results; this.loading = false;
+    },
+    async act(b, action) {
+      try {
+        const u = await Alcove.api(`/api/owner/bookings/${b.reference}/${action}/`, { method: "POST", body: {} });
+        Object.assign(b, u);
+        Alpine.store("toasts").push({ title: action === "check-in" ? "Guest checked in" : "Guest checked out", kind: "success" });
+      } catch (e) { Alpine.store("toasts").push({ title: e.message, kind: "error" }); }
+    },
+  };
+}
+</script>
+{% endblock %}

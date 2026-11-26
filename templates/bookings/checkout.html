@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Pay for {{ booking.reference }} · Alcove{% endblock %}
+{% block scripts %}<script defer src="https://checkout.razorpay.com/v1/checkout.js"></script>{% endblock %}
+{% block content %}
+<div class="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_24rem]" x-data="checkout()" x-init="tick()">
+  <section>
+    <a href="{% url 'property_detail' booking.property.slug %}" class="text-sm text-ink-500 hover:text-ink">Back to {{ booking.property.name }}</a>
+    <h1 class="mt-2 text-4xl font-extrabold">Confirm and pay</h1>
+    <p class="mt-3 rounded-xl bg-marigold-50 px-4 py-3 text-sm text-marigold-700" x-show="remaining > 0">
+      We're holding this room for you for <span class="font-semibold" x-text="clock"></span>. Pay before then to confirm the booking.
+    </p>
+    <p class="mt-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose" x-show="remaining <= 0" x-cloak>
+      Your hold has expired. <a href="{% url 'property_detail' booking.property.slug %}" class="link">Book again</a>.
+    </p>
+
+    <div class="panel mt-6 p-5">
+      <h2 class="text-xl font-bold">Your trip</h2>
+      <dl class="mt-3 grid grid-cols-2 gap-4 text-sm">
+        <div><dt class="text-ink-500">Guests</dt><dd class="font-semibold">{{ booking.guests }}</dd></div>
+        <div><dt class="text-ink-500">Live location on arrival day</dt><dd class="font-semibold">{{ booking.share_location|yesno:"Shared with host,Not shared" }}</dd></div>
+      </dl>
+    </div>
+
+    {% if RAZORPAY_TEST_MODE %}
+    <div class="mt-6 rounded-2xl border border-dashed border-ink-300 p-5 text-sm">
+      <p class="font-semibold">Test mode: no real money moves</p>
+      <p class="mt-1 text-ink-500">Pay with card <span class="font-semibold text-ink">4111 1111 1111 1111</span>, any future expiry and any CVV, or UPI ID <span class="font-semibold text-ink">success@razorpay</span>.</p>
+    </div>
+    {% endif %}
+
+    <p class="error-text mt-4" x-show="error" x-text="error"></p>
+    <button class="btn-accent mt-6 w-full py-3 text-base sm:w-auto sm:px-10" :disabled="busy || remaining <= 0" @click="pay()"
+            x-text="busy ? 'Opening payment…' : 'Pay ₹{{ booking.total|floatformat:2 }}'"></button>
+  </section>
+  <aside>{% include "bookings/_summary.html" %}</aside>
+
+  <!-- demo gateway (used only when no Razorpay keys are configured) -->
+  <div x-show="demo" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4">
+    <div class="panel w-full max-w-sm p-6">
+      <p class="font-display text-xl font-bold">Simulated payment</p>
+      <p class="mt-1 text-sm text-ink-500">Razorpay keys aren't configured, so this stands in for the payment window.</p>
+      <p class="mt-4 font-display text-3xl font-bold">₹{{ booking.total|floatformat:2 }}</p>
+      <div class="mt-5 flex gap-2">
+        <button class="btn-primary flex-1" @click="demoResult(true)">Pay successfully</button>
+        <button class="btn-danger flex-1" @click="demoResult(false)">Fail payment</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function checkout() {
+  const expires = new Date("{{ booking.expires_at|date:'c' }}").getTime();
+  return {
+    busy: false, error: "", demo: false, order: null, remaining: 1, clock: "",
+    tick() {
+      const step = () => {
+        this.remaining = Math.max(0, Math.floor((expires - Date.now()) / 1000));
+        this.clock = `${Math.floor(this.remaining / 60)}:${String(this.remaining % 60).padStart(2, "0")}`;
+      };
+      step(); setInterval(step, 1000);
+    },
+    async pay() {
+      this.busy = true; this.error = "";
+      try {
+        const o = await Alcove.api("/api/payments/order/", { method: "POST", body: { booking: "{{ booking.reference }}" } });
+        this.order = o;
+        if (o.demo) { this.demo = true; this.busy = false; return; }
+        const rzp = new Razorpay({
+          key: o.key, amount: o.amount, currency: o.currency, name: o.name, description: o.description,
+          order_id: o.order_id, prefill: o.prefill, theme: { color: "#1B2A4A" },
+          handler: (resp) => this.verify(resp),
+          modal: { ondismiss: () => { this.busy = false; } },
+        });
+        rzp.on("payment.failed", (r) => {
+          this.error = r.error.description || "Payment failed. Try again or use another method.";
+          Alcove.api("/api/payments/failed/", { method: "POST", body: { razorpay_order_id: o.order_id, reason: r.error.description } });
+          this.busy = false;
+        });
+        rzp.open();
+      } catch (e) { this.error = e.message; this.busy = false; }
+    },
+    async verify(resp) {
+      this.busy = true;
+      try {
+        const d = await Alcove.api("/api/payments/verify/", { method: "POST", body: resp });
+        location.href = d.redirect;
+      } catch (e) { this.error = e.message; this.busy = false; }
+    },
+    demoResult(ok) {
+      this.demo = false;
+      if (ok) return this.verify({ razorpay_order_id: this.order.order_id, razorpay_payment_id: "pay_demo_" + Date.now(), razorpay_signature: "" });
+      Alcove.api("/api/payments/failed/", { method: "POST", body: { razorpay_order_id: this.order.order_id, reason: "Payment declined (simulated)." } });
+      this.error = "Payment declined (simulated). You can try again.";
+    },
+  };
+}
+</script>
+{% endblock %}

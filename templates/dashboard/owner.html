@@ -1,0 +1,106 @@
+{% extends "dashboard/_owner_layout.html" %}
+{% load humanize %}
+{% block title %}Host overview · Alcove{% endblock %}
+{% block scripts %}<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>{% endblock %}
+{% block dash %}
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-extrabold">Good to see you, {{ user.first_name }}</h1>
+    <p class="mt-1 text-ink-500">{% now "l, j F" %}{% if kpis.upcoming_checkins %} · {{ kpis.upcoming_checkins }} arrival{{ kpis.upcoming_checkins|pluralize }} in the next 7 days{% endif %}</p>
+  </div>
+  <a href="{% url 'owner_property_new' %}" class="btn-primary">Add a property</a>
+</div>
+
+{% if not kpis.properties %}
+<div class="mt-8 rounded-3xl border border-dashed border-ink-300 p-10 text-center">
+  <p class="font-display text-2xl font-bold">List your first property</p>
+  <p class="mx-auto mt-2 max-w-md text-ink-500">Add photos, rooms and prices, pin it on the map, and it shows up for travellers searching nearby.</p>
+  <a href="{% url 'owner_property_new' %}" class="btn-accent mt-6">Add a property</a>
+</div>
+{% else %}
+<section class="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-100 bg-ink-100 lg:grid-cols-4" aria-label="This month">
+  <div class="bg-white p-5">
+    <p class="text-sm text-ink-500">Payouts this month</p>
+    <p class="mt-1 font-display text-3xl font-bold">₹{{ kpis.revenue_month|floatformat:0|intcomma }}</p>
+    {% if kpis.revenue_change != None %}<p class="mt-1 text-sm {% if kpis.revenue_change >= 0 %}text-jade{% else %}text-rose{% endif %}">{% if kpis.revenue_change >= 0 %}+{% endif %}{{ kpis.revenue_change }}% vs last month</p>{% endif %}
+  </div>
+  <div class="bg-white p-5">
+    <p class="text-sm text-ink-500">Occupancy this month</p>
+    <p class="mt-1 font-display text-3xl font-bold">{{ kpis.occupancy_month }}%</p>
+    <div class="mt-3 h-1.5 rounded-full bg-ink-50"><div class="h-1.5 rounded-full bg-marigold" style="width: {{ kpis.occupancy_month }}%"></div></div>
+  </div>
+  <div class="bg-white p-5">
+    <p class="text-sm text-ink-500">Guests in house</p>
+    <p class="mt-1 font-display text-3xl font-bold">{{ kpis.in_house }}</p>
+    <p class="mt-1 text-sm text-ink-500">{{ kpis.upcoming_checkins }} arriving this week</p>
+  </div>
+  <div class="bg-white p-5">
+    <p class="text-sm text-ink-500">Awaiting payment</p>
+    <p class="mt-1 font-display text-3xl font-bold">{{ kpis.pending_payments }}</p>
+    <p class="mt-1 text-sm text-ink-500">{{ kpis.lifetime_bookings }} confirmed all time</p>
+  </div>
+</section>
+
+<section class="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+  <div class="panel p-5">
+    <div class="flex items-baseline justify-between">
+      <h2 class="text-xl font-bold">Payouts, last 12 months</h2>
+      <a href="{% url 'owner_earnings' %}" class="link text-sm">Earnings</a>
+    </div>
+    <div class="mt-4 h-64"><canvas id="revChart" aria-label="Monthly payouts chart" role="img"></canvas></div>
+  </div>
+  <div class="panel p-5">
+    <h2 class="text-xl font-bold">Arriving soon</h2>
+    <ul class="mt-3 divide-y divide-ink-100">
+      {% for b in arrivals %}
+      <li><a href="{% url 'owner_booking_detail' b.reference %}" class="flex items-center gap-3 py-3 hover:bg-paper">
+        {% include "partials/avatar.html" with u=b.renter size="h-9 w-9" %}
+        <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold">{{ b.renter.full_name }}</p><p class="truncate text-xs text-ink-500">{{ b.property.name }} · {{ b.room.name }}</p></div>
+        <div class="text-right text-sm"><p class="font-semibold">{% if b.check_in == today %}Today{% else %}{{ b.check_in|date:"D j M" }}{% endif %}</p>{% if b.share_location %}<p class="text-xs text-jade">Sharing location</p>{% endif %}</div>
+      </a></li>
+      {% empty %}<li class="py-6 text-sm text-ink-500">No arrivals in the next 7 days.</li>{% endfor %}
+    </ul>
+    {% if departures %}
+    <h3 class="mt-4 font-display text-base font-bold">In house</h3>
+    <ul class="mt-1 divide-y divide-ink-100">
+      {% for b in departures %}
+      <li><a href="{% url 'owner_booking_detail' b.reference %}" class="flex justify-between py-2.5 text-sm hover:bg-paper"><span>{{ b.renter.full_name }} · {{ b.room.name }}</span><span class="text-ink-500">leaves {{ b.check_out|date:"j M" }}</span></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel mt-6 overflow-hidden" x-data @alcove:notification.window="if (['new_booking','booking_cancelled'].includes($event.detail.verb)) $el.querySelector('[data-refresh]').classList.remove('hidden')">
+  <div class="flex items-center justify-between p-5">
+    <h2 class="text-xl font-bold">Latest bookings</h2>
+    <div class="flex items-center gap-3">
+      <button data-refresh class="hidden chip bg-marigold text-ink" onclick="location.reload()">New activity, refresh</button>
+      <a href="{% url 'owner_bookings' %}" class="link text-sm">All bookings</a>
+    </div>
+  </div>
+  {% include "dashboard/_bookings_table.html" with rows=recent %}
+</section>
+{% endif %}
+{{ series|json_script:"series" }}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const el = document.getElementById("revChart");
+  if (!el) return;
+  const s = JSON.parse(document.getElementById("series").textContent);
+  const go = () => {
+    if (!window.Chart) return setTimeout(go, 50);
+    new Chart(el, {
+      type: "bar",
+      data: { labels: s.labels, datasets: [{ label: "Payout", data: s.payout, backgroundColor: s.payout.map((_, i) => i === s.payout.length - 1 ? "#F2A51A" : "#1B2A4A"), borderRadius: 6, maxBarThickness: 32 }] },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => Alcove.money(c.raw) + ` · ${s.bookings[c.dataIndex]} booking(s)` } } },
+        scales: { y: { ticks: { callback: (v) => Alcove.money(v) }, grid: { color: "#EEF1F7" }, border: { display: false } }, x: { grid: { display: false } } },
+      },
+    });
+  };
+  go();
+});
+</script>
+{% endblock %}

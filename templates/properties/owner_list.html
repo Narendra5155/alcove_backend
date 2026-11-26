@@ -1,0 +1,36 @@
+{% extends "dashboard/_owner_layout.html" %}
+{% block title %}Properties · Host · Alcove{% endblock %}
+{% block dash %}
+<div x-data="{ items: [], loaded: false }" x-init="Alcove.api('/api/owner/properties/').then(d => { items = d; loaded = true })">
+  <div class="flex items-end justify-between gap-4">
+    <h1 class="text-3xl font-extrabold">Properties</h1>
+    <a href="{% url 'owner_property_new' %}" class="btn-primary">Add a property</a>
+  </div>
+  <div class="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    <template x-for="p in items" :key="p.id">
+      <div class="panel overflow-hidden">
+        <div class="aspect-[16/10] bg-ink-50">
+          <img x-show="p.images.length" :src="p.images.length && (p.images.find(i => i.is_cover) || p.images[0]).url" alt="" class="h-full w-full object-cover">
+        </div>
+        <div class="p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0"><p class="truncate font-semibold" x-text="p.name"></p><p class="text-sm text-ink-500" x-text="p.city"></p></div>
+            <span class="chip" :class="p.is_active ? 'bg-jade-50 text-jade' : 'bg-ink-50 text-ink-500'" x-text="p.is_active ? 'Listed' : 'Hidden'"></span>
+          </div>
+          <p class="mt-2 text-sm text-ink-500"><span x-text="p.rooms.length"></span> room type<span x-show="p.rooms.length !== 1">s</span> · <span x-text="p.rooms.reduce((a, r) => a + r.quantity, 0)"></span> units · <span x-text="p.images.length"></span> photos</p>
+          <p x-show="!p.rooms.length || !p.images.length" class="mt-2 text-sm text-marigold-700">Add <span x-text="!p.rooms.length ? 'rooms' : 'photos'"></span> so guests can book it.</p>
+          <div class="mt-4 flex gap-2">
+            <a :href="`/dashboard/owner/properties/${p.id}/edit/`" class="btn-ghost flex-1">Edit</a>
+            <a :href="`/stays/${p.slug}/`" class="btn-ghost flex-1">View listing</a>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+  <div x-show="loaded && !items.length" x-cloak class="mt-6 rounded-3xl border border-dashed border-ink-300 p-10 text-center">
+    <p class="font-display text-xl font-bold">No properties yet</p>
+    <p class="mt-1 text-ink-500">Add your first property to start taking bookings.</p>
+    <a href="{% url 'owner_property_new' %}" class="btn-accent mt-4">Add a property</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}My trips · Alcove{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <h1 class="text-4xl font-extrabold">My trips</h1>
+    <a href="{% url 'search' %}" class="btn-primary">Find a stay</a>
+  </div>
+
+  {% if arrival_today %}
+  <a href="{% url 'renter_booking_detail' arrival_today.reference %}" class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-ink p-5 text-white">
+    <div>
+      <p class="font-display text-xl font-bold text-white">You're checking in today at {{ arrival_today.property.name }}</p>
+      <p class="text-ink-100">{% if arrival_today.share_location %}Your host can see your live location while this page is open.{% else %}Turn on location sharing so your host knows when you're close.{% endif %}</p>
+    </div>
+    <span class="btn-accent">Open trip</span>
+  </a>
+  {% endif %}
+
+  <h2 class="mt-10 text-2xl font-bold">Upcoming</h2>
+  <div class="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {% for b in upcoming %}
+    <a href="{% if b.status == 'PENDING' %}{% url 'checkout' b.reference %}{% else %}{% url 'renter_booking_detail' b.reference %}{% endif %}" class="group block">
+      <div class="arch aspect-[4/3] bg-ink-50">{% if b.property.cover_url %}<img src="{{ b.property.cover_url }}" alt="" class="h-full w-full object-cover">{% endif %}</div>
+      <div class="mt-3 flex items-start justify-between gap-2">
+        <div class="min-w-0"><p class="truncate font-semibold">{{ b.property.name }}</p><p class="text-sm text-ink-500">{{ b.check_in|date:"j M" }} – {{ b.check_out|date:"j M Y" }} · {{ b.room.name }}</p></div>
+        {% include "partials/status.html" %}
+      </div>
+      {% if b.status == 'PENDING' %}<p class="mt-1 text-sm font-medium text-marigold-700">Complete payment to confirm</p>{% endif %}
+    </a>
+    {% empty %}
+    <div class="rounded-2xl border border-dashed border-ink-300 p-8 sm:col-span-2 lg:col-span-3">
+      <p class="font-semibold">No upcoming trips.</p>
+      <p class="mt-1 text-sm text-ink-500">Search by city or use your location to find a room nearby.</p>
+      <a href="{% url 'search' %}?near=me" class="btn-ghost mt-4">Stays near me</a>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if past %}
+  <h2 class="mt-12 text-2xl font-bold">Past and cancelled</h2>
+  <ul class="panel mt-4 divide-y divide-ink-100">
+    {% for b in past %}
+    <li><a href="{% url 'renter_booking_detail' b.reference %}" class="flex flex-wrap items-center gap-4 p-4 hover:bg-paper">
+      <div class="arch-sm h-14 w-12 shrink-0 bg-ink-50">{% if b.property.cover_url %}<img src="{{ b.property.cover_url }}" alt="" class="h-full w-full object-cover">{% endif %}</div>
+      <div class="min-w-0 flex-1"><p class="font-semibold">{{ b.property.name }}</p><p class="text-sm text-ink-500">{{ b.check_in|date:"j M" }} – {{ b.check_out|date:"j M Y" }}</p></div>
+      {% if b.status == 'COMPLETED' and not b.review %}<span class="text-sm font-medium text-marigold-700">Leave a review</span>{% endif %}
+      {% include "partials/status.html" %}
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}

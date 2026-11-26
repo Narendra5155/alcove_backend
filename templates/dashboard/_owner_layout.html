@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block footer %}{% endblock %}
+{% block content %}
+{% with n=request.resolver_match.url_name %}
+<div class="mx-auto grid max-w-[90rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[14rem_1fr]">
+  <aside class="lg:sticky lg:top-24 lg:self-start">
+    <nav class="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Host dashboard">
+      <a href="{% url 'owner_dashboard' %}" class="nav-link whitespace-nowrap {% if n == 'owner_dashboard' %}nav-link-active{% endif %}">Overview</a>
+      <a href="{% url 'owner_bookings' %}" class="nav-link whitespace-nowrap {% if n == 'owner_bookings' or n == 'owner_booking_detail' %}nav-link-active{% endif %}">Bookings</a>
+      <a href="{% url 'owner_calendar' %}" class="nav-link whitespace-nowrap {% if n == 'owner_calendar' %}nav-link-active{% endif %}">Calendar</a>
+      <a href="{% url 'owner_properties' %}" class="nav-link whitespace-nowrap {% if 'owner_propert' in n %}nav-link-active{% endif %}">Properties</a>
+      <a href="{% url 'owner_earnings' %}" class="nav-link whitespace-nowrap {% if n == 'owner_earnings' %}nav-link-active{% endif %}">Earnings</a>
+      <a href="{% url 'profile' %}" class="nav-link whitespace-nowrap">Profile</a>
+    </nav>
+  </aside>
+  <div class="min-w-0">{% block dash %}{% endblock %}</div>
+</div>
+{% endwith %}
+{% endblock %}

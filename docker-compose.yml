@@ -1,0 +1,59 @@
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    DATABASE_URL: postgis://alcove:alcove@db:5432/alcove
+    REDIS_URL: redis://redis:6379
+    MAILPIT_HOST: mailpit  # used only when Brevo isn't configured
+  volumes:
+    - .:/app
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_started
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: alcove
+      POSTGRES_USER: alcove
+      POSTGRES_PASSWORD: alcove
+    ports: ["5433:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alcove"]
+      interval: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6380:6379"]
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports: ["8025:8025", "1025:1025"]
+
+  web:
+    <<: *app
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             daphne -b 0.0.0.0 -p 8000 alcove.asgi:application"
+    ports: ["8000:8000"]
+
+  worker:
+    <<: *app
+    command: celery -A alcove worker -l info
+
+  beat:
+    <<: *app
+    command: celery -A alcove beat -l info
+
+  tailwind:
+    <<: *app
+    command: tailwindcss -i static/src/input.css -o static/css/app.css --watch=always
+    depends_on: []
+
+volumes:
+  pgdata:

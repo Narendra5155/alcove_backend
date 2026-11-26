@@ -1,0 +1,14 @@
+<!doctype html>
+<html><body style="margin:0;background:#F4F6F9;font-family:Arial,Helvetica,sans-serif;color:#1B2A4A">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
+    <table role="presentation" width="100%" style="max-width:460px;background:#fff;border:1px solid #D9DFEB;border-radius:16px;padding:32px">
+      <tr><td>
+        <p style="margin:0 0 24px;font-size:22px;font-weight:800">alcove</p>
+        <p style="margin:0 0 8px">Hi {{ name }},</p>
+        <p style="margin:0 0 20px;color:#4A5B80">{% if purpose == "login" %}Use this code to finish signing in.{% elif purpose == "verify_email" %}Use this code to verify your email address.{% else %}Use this code to reset your password.{% endif %}</p>
+        <p style="margin:0 0 20px;font-size:34px;font-weight:800;letter-spacing:10px;background:#FEF6E6;border-radius:12px;padding:16px;text-align:center">{{ code }}</p>
+        <p style="margin:0;color:#4A5B80;font-size:13px">It expires in 5 minutes. If you didn't request it, ignore this email — your account is safe.</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>

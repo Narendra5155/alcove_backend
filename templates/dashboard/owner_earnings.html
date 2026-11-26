@@ -1,0 +1,38 @@
+{% extends "dashboard/_owner_layout.html" %}
+{% load humanize %}
+{% block title %}Earnings · Host · Alcove{% endblock %}
+{% block dash %}
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-extrabold">Earnings</h1>
+    <p class="mt-1 text-ink-500">Payouts are room charges minus Alcove's 10% fee. Taxes collected are passed through.</p>
+  </div>
+  <a href="{% url 'owner_earnings_csv' %}" class="btn-ghost">Download CSV</a>
+</div>
+<section class="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-ink-100 bg-ink-100 sm:grid-cols-3">
+  <div class="bg-white p-5"><p class="text-sm text-ink-500">Your payouts</p><p class="mt-1 font-display text-3xl font-bold">₹{{ totals.payout|floatformat:0|intcomma }}</p></div>
+  <div class="bg-white p-5"><p class="text-sm text-ink-500">Room charges</p><p class="mt-1 font-display text-3xl font-bold">₹{{ totals.gross|floatformat:0|intcomma }}</p></div>
+  <div class="bg-white p-5"><p class="text-sm text-ink-500">Refunded to guests</p><p class="mt-1 font-display text-3xl font-bold">₹{{ totals.refunded|floatformat:0|intcomma }}</p></div>
+</section>
+<div class="panel mt-6 overflow-x-auto">
+  <table class="w-full min-w-[48rem] text-left text-sm">
+    <thead class="border-b border-ink-100 bg-paper text-ink-500">
+      <tr><th class="px-5 py-2.5 font-medium">Paid</th><th class="px-3 py-2.5 font-medium">Booking</th><th class="px-3 py-2.5 font-medium">Guest</th><th class="px-3 py-2.5 text-right font-medium">Guest paid</th><th class="px-3 py-2.5 text-right font-medium">Fee</th><th class="px-5 py-2.5 text-right font-medium">Payout</th></tr>
+    </thead>
+    <tbody class="divide-y divide-ink-100">
+      {% for p in ledger %}
+      <tr class="{% if p.status == 'REFUNDED' %}text-ink-300{% endif %}">
+        <td class="px-5 py-3">{{ p.paid_at|date:"j M Y" }}</td>
+        <td class="px-3 py-3"><a href="{% url 'owner_booking_detail' p.booking.reference %}" class="font-semibold hover:underline">{{ p.booking.reference }}</a><p class="text-xs">{{ p.booking.property.name }}</p></td>
+        <td class="px-3 py-3">{{ p.booking.renter.full_name }}</td>
+        <td class="px-3 py-3 text-right">₹{{ p.amount|floatformat:2 }}</td>
+        <td class="px-3 py-3 text-right">{% if p.status == 'PAID' %}−₹{{ p.booking.platform_fee|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td class="px-5 py-3 text-right font-semibold">{% if p.status == 'PAID' %}₹{{ p.booking.owner_payout|floatformat:2 }}{% else %}Refunded{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="px-5 py-10 text-center text-ink-500">Payouts appear here once guests pay for their bookings.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

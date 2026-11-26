@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Profile · Alcove{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 py-10 sm:px-6" x-data="profilePage()" x-init="load()">
+  <h1 class="text-3xl font-extrabold">Profile</h1>
+  <p class="mt-1 text-ink-500">{% if user.is_owner %}Guests see your name and photo on your listings.{% else %}Hosts see your name and photo when you book.{% endif %}</p>
+
+  <section class="panel mt-8 flex flex-col items-start gap-6 p-6 sm:flex-row sm:items-center">
+    <div class="arch-sm h-28 w-24 shrink-0 bg-marigold-100">
+      <img x-show="p.avatar_url" :src="p.avatar_url" alt="Profile photo" class="h-full w-full object-cover">
+      <div x-show="!p.avatar_url" class="flex h-full items-end justify-center pb-4 font-display text-3xl font-bold">{{ user.initials }}</div>
+    </div>
+    <div>
+      <p class="font-semibold">Profile photo</p>
+      <p class="text-sm text-ink-500">JPEG, PNG or WEBP up to 5 MB. We crop it to a square.</p>
+      <div class="mt-3 flex gap-2">
+        <label class="btn-ghost cursor-pointer">
+          <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="upload($event)">
+          <span x-text="uploading ? 'Uploading…' : (p.avatar_url ? 'Change photo' : 'Upload photo')"></span>
+        </label>
+        <button class="btn-danger" x-show="p.avatar_url" @click="removeAvatar()">Remove</button>
+      </div>
+    </div>
+  </section>
+
+  <form class="panel mt-6 grid gap-4 p-6 sm:grid-cols-2" @submit.prevent="save()">
+    <div class="sm:col-span-2"><label class="label" for="fn">Full name</label><input id="fn" class="field" x-model="p.full_name" required></div>
+    <div><label class="label">Email</label><input class="field bg-paper" :value="p.email" disabled></div>
+    <div><label class="label" for="ph">Phone</label><input id="ph" class="field" x-model="p.phone" inputmode="tel" placeholder="+91"></div>
+    <div><label class="label" for="ct">City</label><input id="ct" class="field" x-model="p.city"></div>
+    <div class="sm:col-span-2"><label class="label" for="bio">About you</label><textarea id="bio" rows="3" class="field" x-model="p.bio" maxlength="500"></textarea></div>
+    {% if user.is_owner %}
+    <div><label class="label" for="bn">Business name</label><input id="bn" class="field" x-model="p.business_name"></div>
+    <div><label class="label" for="gst">GSTIN (optional)</label><input id="gst" class="field uppercase" x-model="p.gstin" maxlength="15"></div>
+    {% endif %}
+    <div class="flex items-center gap-3 sm:col-span-2">
+      <button class="btn-primary" :disabled="saving" x-text="saving ? 'Saving…' : 'Save changes'"></button>
+      <p class="error-text mt-0" x-show="error" x-text="error"></p>
+    </div>
+  </form>
+
+  <section id="hosting" class="panel mt-6 flex flex-wrap items-center justify-between gap-4 p-6" x-data="{ busy: false, err: '' }">
+    {% if user.is_owner %}
+    <div class="max-w-lg">
+      <h2 class="text-xl font-bold">Switch to travelling</h2>
+      <p class="mt-1 text-sm text-ink-500">Book stays with this account. Your listings are hidden from search until you switch back to hosting.</p>
+    </div>
+    <button class="btn-ghost" :disabled="busy" @click="busy = true; err = ''; Alcove.api('/api/profile/role/', { method: 'POST', body: { role: 'RENTER' } }).then(d => location.href = d.redirect).catch(e => { err = e.message; busy = false })">Switch to travelling</button>
+    {% else %}
+    <div class="max-w-lg">
+      <h2 class="text-xl font-bold">Host on Alcove</h2>
+      <p class="mt-1 text-sm text-ink-500">Turn this account into a host account to list properties, take bookings and payments, and manage check-ins.</p>
+    </div>
+    <button class="btn-accent" :disabled="busy" @click="busy = true; err = ''; Alcove.api('/api/profile/role/', { method: 'POST', body: { role: 'OWNER' } }).then(d => location.href = '{% url 'owner_property_new' %}').catch(e => { err = e.message; busy = false })" x-text="busy ? 'Switching…' : 'Start hosting'"></button>
+    {% endif %}
+    <p class="error-text w-full" x-show="err" x-text="err"></p>
+  </section>
+</div>
+<script>
+function profilePage() {
+  return {
+    p: {}, saving: false, uploading: false, error: "",
+    async load() { this.p = await Alcove.api("/api/profile/"); },
+    async save() {
+      this.saving = true; this.error = "";
+      try {
+        this.p = await Alcove.api("/api/profile/", { method: "PATCH", body: this.p });
+        Alpine.store("toasts").push({ title: "Profile saved", kind: "success" });
+      } catch (e) { this.error = e.message; } finally { this.saving = false; }
+    },
+    async upload(e) {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 5 * 1024 * 1024) { Alpine.store("toasts").push({ title: "That photo is over 5 MB", kind: "error" }); return; }
+      const fd = new FormData(); fd.append("avatar", f);
+      this.uploading = true;
+      try {
+        const d = await Alcove.api("/api/profile/avatar/", { method: "POST", form: fd });
+        this.p.avatar_url = d.avatar_url;
+        Alpine.store("toasts").push({ title: "Photo updated", kind: "success" });
+      } catch (err) { Alpine.store("toasts").push({ title: err.message, kind: "error" }); }
+      finally { this.uploading = false; e.target.value = ""; }
+    },
+    async removeAvatar() {
+      await Alcove.api("/api/profile/avatar/", { method: "DELETE" });
+      this.p.avatar_url = "";
+    },
+  };
+}
+</script>
+{% endblock %}

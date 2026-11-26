@@ -1,0 +1,19 @@
+<div class="panel overflow-hidden">
+  <div class="flex gap-4 p-5">
+    <div class="arch-sm h-24 w-20 shrink-0 bg-ink-50">{% if booking.property.cover_url %}<img src="{{ booking.property.cover_url }}" alt="" class="h-full w-full object-cover">{% endif %}</div>
+    <div class="min-w-0">
+      <p class="font-semibold">{{ booking.property.name }}</p>
+      <p class="text-sm text-ink-500">{{ booking.room.name }} · {{ booking.property.city }}</p>
+      <p class="mt-1 text-sm text-ink-500">Ref {{ booking.reference }}</p>
+    </div>
+  </div>
+  <dl class="grid grid-cols-2 border-t border-ink-100 text-sm">
+    <div class="border-r border-ink-100 p-4"><dt class="text-ink-500">Check in</dt><dd class="font-semibold">{{ booking.check_in|date:"D, j M Y" }}</dd><dd class="text-ink-500">from {{ booking.property.check_in_time|time:"g:i A" }}</dd></div>
+    <div class="p-4"><dt class="text-ink-500">Check out</dt><dd class="font-semibold">{{ booking.check_out|date:"D, j M Y" }}</dd><dd class="text-ink-500">by {{ booking.property.check_out_time|time:"g:i A" }}</dd></div>
+  </dl>
+  <dl class="space-y-2 border-t border-ink-100 p-5 text-sm">
+    <div class="flex justify-between"><dt class="text-ink-500">₹{{ booking.nightly_rate|floatformat:0 }} × {{ booking.nights }} night{{ booking.nights|pluralize }}{% if booking.units > 1 %} × {{ booking.units }} rooms{% endif %}</dt><dd>₹{{ booking.subtotal|floatformat:2 }}</dd></div>
+    <div class="flex justify-between"><dt class="text-ink-500">Taxes (12% GST)</dt><dd>₹{{ booking.taxes|floatformat:2 }}</dd></div>
+    <div class="flex justify-between border-t border-ink-100 pt-2 text-base font-semibold"><dt>Total</dt><dd>₹{{ booking.total|floatformat:2 }}</dd></div>
+  </dl>
+</div>

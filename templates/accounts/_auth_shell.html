@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load static %}
+{% block scripts %}<script defer src="{% static 'js/auth.js' %}"></script>{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<div class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-12 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_28rem]">
+  <aside class="hidden lg:block">
+    <div class="arch relative mx-auto aspect-[3/4] max-w-sm bg-ink">
+      <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=900&q=70" alt="" class="h-full w-full object-cover opacity-80">
+      <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink to-transparent p-8 text-white">
+        <p class="font-display text-2xl font-bold leading-tight">{% block aside %}Your next room is closer than you think.{% endblock %}</p>
+      </div>
+    </div>
+  </aside>
+  <section class="panel p-6 sm:p-8">{% block form %}{% endblock %}</section>
+</div>
+{% endblock %}

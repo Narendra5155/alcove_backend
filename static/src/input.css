@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-paper text-ink font-sans antialiased; }
+  h1, h2, h3, h4 { @apply font-display tracking-tight text-ink; }
+  :focus-visible { @apply outline-none ring-2 ring-marigold ring-offset-2 ring-offset-paper; }
+  [x-cloak] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-ink text-white hover:bg-ink-700; }
+  .btn-accent { @apply btn bg-marigold text-ink hover:bg-marigold-600; }
+  .btn-ghost { @apply btn border border-ink-100 bg-white text-ink hover:border-ink-300; }
+  .btn-danger { @apply btn border border-rose/30 bg-white text-rose hover:bg-rose-50; }
+  .field { @apply block w-full rounded-xl border border-ink-100 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-300 focus:border-ink focus:ring-0; }
+  .label { @apply mb-1.5 block text-sm font-medium text-ink-700; }
+  .panel { @apply rounded-2xl border border-ink-100 bg-white; }
+  .arch { border-radius: 999px 999px 14px 14px; @apply overflow-hidden; }
+  .arch-sm { border-radius: 80px 80px 10px 10px; @apply overflow-hidden; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .link { @apply font-medium text-ink underline decoration-marigold decoration-2 underline-offset-4 hover:decoration-ink; }
+  .nav-link { @apply rounded-lg px-3 py-2 text-sm font-medium text-ink-500 hover:text-ink hover:bg-ink-50; }
+  .nav-link-active { @apply text-ink bg-ink-50; }
+  .error-text { @apply mt-1 text-sm text-rose; }
+}
+
+/* Status chips (kept here so they're never purged) */
+.st-PENDING { background:#FEF6E6; color:#A86C04; }
+.st-CONFIRMED { background:#E8F4F1; color:#18665A; }
+.st-CHECKED_IN { background:#E6F0FB; color:#1D5FA8; }
+.st-COMPLETED { background:#EEF1F7; color:#4A5B80; }
+.st-CANCELLED { background:#FBEBEE; color:#C8364E; }
+.st-EXPIRED { background:#F1F1F3; color:#6B6F7B; }
+
+.leaflet-container { font-family: "Public Sans", system-ui, sans-serif; z-index: 0; }
+.price-pin { background:#1B2A4A; color:#fff; font-weight:600; font-size:12px; padding:3px 8px; border-radius:999px; white-space:nowrap; box-shadow:0 1px 0 rgba(27,42,74,.25); border:2px solid #fff; }
+.price-pin.active { background:#F2A51A; color:#1B2A4A; }
+.me-dot { width:16px; height:16px; border-radius:50%; background:#1F7A6B; border:3px solid #fff; box-shadow:0 0 0 6px rgba(31,122,107,.25); }
+.home-pin { width:22px; height:22px; border-radius:11px 11px 4px 4px; background:#F2A51A; border:3px solid #1B2A4A; }

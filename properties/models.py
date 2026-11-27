@@ -14,7 +14,7 @@ class Amenity(models.Model):
     )
 
     class Meta:
-        ordering = ["name"]
+        ordering = ("name",)
         verbose_name_plural = "amenities"
 
     def __str__(self):
@@ -53,7 +53,7 @@ class Property(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ("-created_at",)
         verbose_name_plural = "properties"
 
     def __str__(self):
@@ -85,10 +85,12 @@ class Property(models.Model):
     @property
     def starting_price(self):
         if hasattr(self, "min_price"):
-            return self.min_price
-        return self.rooms.filter(is_active=True).aggregate(m=Min("price_per_night"))[
-            "m"
-        ]
+            return getattr(self, "min_price", 0)
+        return (
+            getattr(self, "rooms", None)
+            .filter(is_active=True)
+            .aggregate(m=Min("price_per_night"))["m"]
+        )
 
     @property
     def rating(self):
@@ -111,7 +113,7 @@ class PropertyImage(models.Model):
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = ["-is_cover", "order", "id"]
+        ordering = ("-is_cover", "order", "id")
 
     @classmethod
     def create_from_upload(cls, prop, uploaded, **kwargs):
@@ -139,7 +141,7 @@ class Room(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ["price_per_night"]
+        ordering = ("price_per_night",)
 
     def __str__(self):
         return f"{self.property.name} · {self.name}"

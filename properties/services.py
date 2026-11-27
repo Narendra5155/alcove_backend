@@ -1,10 +1,23 @@
 """Geo search and availability queries."""
+
 from datetime import date
 
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
-from django.db.models import Avg, Count, Exists, F, IntegerField, Min, OuterRef, Q, Subquery, Sum, Value
+from django.db.models import (
+    Avg,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    Min,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+)
 from django.db.models.functions import Coalesce
 
 from .models import Property, Room
@@ -30,9 +43,9 @@ def booked_units_subquery(checkin: date, checkout: date):
 
 
 def rooms_with_availability(qs, checkin: date, checkout: date):
-    return qs.annotate(booked=Coalesce(booked_units_subquery(checkin, checkout), Value(0))).annotate(
-        available=F("quantity") - F("booked")
-    )
+    return qs.annotate(
+        booked=Coalesce(booked_units_subquery(checkin, checkout), Value(0))
+    ).annotate(available=F("quantity") - F("booked"))
 
 
 def search_properties(
@@ -60,7 +73,9 @@ def search_properties(
 
     rooms = Room.objects.filter(room_filter)
     if checkin and checkout:
-        rooms = rooms_with_availability(rooms, checkin, checkout).filter(available__gte=1)
+        rooms = rooms_with_availability(rooms, checkin, checkout).filter(
+            available__gte=1
+        )
     qs = qs.filter(Exists(rooms.filter(property=OuterRef("pk"))))
 
     if lat is not None and lng is not None:
@@ -71,7 +86,9 @@ def search_properties(
     if city:
         qs = qs.filter(city__iexact=city)
     if q:
-        qs = qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(address__icontains=q))
+        qs = qs.filter(
+            Q(name__icontains=q) | Q(city__icontains=q) | Q(address__icontains=q)
+        )
     if property_type:
         qs = qs.filter(property_type=property_type)
     if amenities:
@@ -83,4 +100,8 @@ def search_properties(
         avg_rating=Avg("reviews__rating"),
         review_count=Count("reviews", distinct=True),
     ).prefetch_related("images")
-    return qs.order_by("distance") if lat is not None and lng is not None else qs.order_by("-created_at")
+    return (
+        qs.order_by("distance")
+        if lat is not None and lng is not None
+        else qs.order_by("-created_at")
+    )

@@ -15,11 +15,11 @@ class ImageInline(admin.TabularInline):
 
 @admin.register(Property)
 class PropertyAdmin(admin.GISModelAdmin):
-    list_display = ["name", "city", "property_type", "owner", "is_active", "created_at"]
-    list_filter = ["property_type", "city", "is_active"]
-    search_fields = ["name", "city", "owner__email"]
-    inlines = [RoomInline, ImageInline]
-    filter_horizontal = ["amenities"]
+    list_display = ("name", "city", "property_type", "owner", "is_active", "created_at")
+    list_filter = ("property_type", "city", "is_active")
+    search_fields = ("name", "city", "owner__email")
+    inlines = (RoomInline, ImageInline)
+    filter_horizontal = ("amenities",)
 
 
 admin.site.register(Amenity)

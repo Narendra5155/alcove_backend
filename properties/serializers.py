@@ -7,7 +7,7 @@ from .models import Amenity, Property, PropertyImage, Room
 class AmenitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Amenity
-        fields = ["id", "name", "icon"]
+        fields = ("id", "name", "icon")
 
 
 class PropertyImageSerializer(serializers.ModelSerializer):
@@ -15,7 +15,7 @@ class PropertyImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyImage
-        fields = ["id", "url", "caption", "is_cover", "order"]
+        fields = ("id", "url", "caption", "is_cover", "order")
 
     def get_url(self, obj):
         return obj.image.url
@@ -26,7 +26,17 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ["id", "name", "description", "price_per_night", "max_guests", "beds", "quantity", "is_active", "available"]
+        fields = (
+            "id",
+            "name",
+            "description",
+            "price_per_night",
+            "max_guests",
+            "beds",
+            "quantity",
+            "is_active",
+            "available",
+        )
 
     def validate_price_per_night(self, v):
         if v <= 0:
@@ -38,19 +48,36 @@ class PropertyCardSerializer(serializers.ModelSerializer):
     lat = serializers.FloatField(read_only=True)
     lng = serializers.FloatField(read_only=True)
     cover_url = serializers.CharField(read_only=True)
-    starting_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    starting_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
     rating = serializers.FloatField(read_only=True)
     review_count = serializers.IntegerField(read_only=True, default=0)
     distance_km = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
-    type_label = serializers.CharField(source="get_property_type_display", read_only=True)
+    type_label = serializers.CharField(
+        source="get_property_type_display", read_only=True
+    )
 
     class Meta:
         model = Property
-        fields = [
-            "id", "slug", "name", "property_type", "type_label", "city", "address", "lat", "lng",
-            "cover_url", "starting_price", "rating", "review_count", "distance_km", "url",
-        ]
+        fields = (
+            "id",
+            "slug",
+            "name",
+            "property_type",
+            "type_label",
+            "city",
+            "address",
+            "lat",
+            "lng",
+            "cover_url",
+            "starting_price",
+            "rating",
+            "review_count",
+            "distance_km",
+            "url",
+        )
 
     def get_distance_km(self, obj):
         d = getattr(obj, "distance", None)
@@ -67,10 +94,18 @@ class PropertyDetailSerializer(PropertyCardSerializer):
     owner_name = serializers.CharField(source="owner.full_name", read_only=True)
 
     class Meta(PropertyCardSerializer.Meta):
-        fields = PropertyCardSerializer.Meta.fields + [
-            "description", "state", "pincode", "check_in_time", "check_out_time", "house_rules",
-            "images", "rooms", "amenities", "owner_name",
-        ]
+        fields = PropertyCardSerializer.Meta.fields + (
+            "description",
+            "state",
+            "pincode",
+            "check_in_time",
+            "check_out_time",
+            "house_rules",
+            "images",
+            "rooms",
+            "amenities",
+            "owner_name",
+        )
 
     def get_rooms(self, obj):
         return RoomSerializer(obj.rooms.filter(is_active=True), many=True).data
@@ -89,12 +124,27 @@ class OwnerPropertySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Property
-        fields = [
-            "id", "slug", "name", "property_type", "description", "address", "city", "state", "pincode",
-            "lat", "lng", "amenity_ids", "check_in_time", "check_out_time", "house_rules", "is_active",
-            "images", "rooms",
-        ]
-        read_only_fields = ["slug"]
+        fields = (
+            "id",
+            "slug",
+            "name",
+            "property_type",
+            "description",
+            "address",
+            "city",
+            "state",
+            "pincode",
+            "lat",
+            "lng",
+            "amenity_ids",
+            "check_in_time",
+            "check_out_time",
+            "house_rules",
+            "is_active",
+            "images",
+            "rooms",
+        )
+        read_only_fields = ("slug",)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

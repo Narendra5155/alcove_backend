@@ -9,7 +9,7 @@ from notifications.services import notify
 from properties.models import Room
 
 from . import services
-from .models import Booking, Review
+from .models import Booking
 from .serializers import BookingCreateSerializer, BookingSerializer, ReviewSerializer
 
 
@@ -18,7 +18,7 @@ def _err(e):
 
 
 class QuoteView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = (AllowAny,)
 
     class Params(serializers.Serializer):
         room_id = serializers.IntegerField()
@@ -39,7 +39,7 @@ class QuoteView(APIView):
 
 
 class BookingCreateView(APIView):
-    permission_classes = [IsRenterRole]
+    permission_classes = (IsRenterRole,)
 
     def post(self, request):
         s = BookingCreateSerializer(data=request.data)
@@ -48,21 +48,30 @@ class BookingCreateView(APIView):
             b = services.create_booking(renter=request.user, **s.validated_data)
         except services.BookingError as e:
             return _err(e)
-        return Response({**BookingSerializer(b).data, "checkout_url": f"/book/{b.reference}/pay/"}, status=201)
+        return Response(
+            {**BookingSerializer(b).data, "checkout_url": f"/book/{b.reference}/pay/"},
+            status=201,
+        )
 
 
 class RenterBookingAction(APIView):
-    permission_classes = [IsRenterRole]
+    permission_classes = (IsRenterRole,)
 
     def get_booking(self, request, ref):
-        return get_object_or_404(Booking.objects.select_related("property", "room"), reference=ref, renter=request.user)
+        return get_object_or_404(
+            Booking.objects.select_related("property", "room"),
+            reference=ref,
+            renter=request.user,
+        )
 
 
 class RenterCancelView(RenterBookingAction):
     def post(self, request, ref):
         b = self.get_booking(request, ref)
         try:
-            b = services.cancel_booking(b.pk, request.user, request.data.get("reason", ""))
+            b = services.cancel_booking(
+                b.pk, request.user, request.data.get("reason", "")
+            )
         except services.BookingError as e:
             return _err(e)
         return Response(BookingSerializer(b).data)
@@ -88,13 +97,18 @@ class ReviewView(RenterBookingAction):
         s = ReviewSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         s.save(booking=b, property=b.property, renter=request.user)
-        notify(b.owner, "new_review", f"New {s.validated_data['rating']}★ review",
-               f"{request.user.full_name} reviewed {b.property.name}.", f"/stays/{b.property.slug}/")
+        notify(
+            b.owner,
+            "new_review",
+            f"New {s.validated_data['rating']}★ review",
+            f"{request.user.full_name} reviewed {b.property.name}.",
+            f"/stays/{b.property.slug}/",
+        )
         return Response(s.data, status=201)
 
 
 class OwnerBookingAction(APIView):
-    permission_classes = [IsOwnerRole]
+    permission_classes = (IsOwnerRole,)
     op = None
 
     def post(self, request, ref):
@@ -105,14 +119,16 @@ class OwnerBookingAction(APIView):
             elif self.op == "check_out":
                 b = services.check_out(b.pk, request.user)
             else:
-                b = services.cancel_booking(b.pk, request.user, request.data.get("reason", ""))
+                b = services.cancel_booking(
+                    b.pk, request.user, request.data.get("reason", "")
+                )
         except services.BookingError as e:
             return _err(e)
         return Response(BookingSerializer(b).data)
 
 
 class MyBookingsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         if request.user.is_owner:
@@ -122,5 +138,7 @@ class MyBookingsView(APIView):
         st = request.query_params.get("status")
         if st:
             qs = qs.filter(status=st)
-        qs = qs.select_related("property", "room", "renter").prefetch_related("property__images")[:200]
+        qs = qs.select_related("property", "room", "renter").prefetch_related(
+            "property__images"
+        )[:200]
         return Response({"results": BookingSerializer(qs, many=True).data})

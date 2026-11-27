@@ -9,7 +9,9 @@ from core.images import resize_image, validate_image
 
 class Amenity(models.Model):
     name = models.CharField(max_length=60, unique=True)
-    icon = models.CharField(max_length=40, blank=True, help_text="Icon key used by the frontend")
+    icon = models.CharField(
+        max_length=40, blank=True, help_text="Icon key used by the frontend"
+    )
 
     class Meta:
         ordering = ["name"]
@@ -28,10 +30,14 @@ class Property(models.Model):
         RESORT = "RESORT", "Resort"
         HOSTEL = "HOSTEL", "Hostel"
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="properties")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="properties"
+    )
     name = models.CharField(max_length=150)
     slug = models.SlugField(max_length=170, unique=True, blank=True)
-    property_type = models.CharField(max_length=12, choices=Type.choices, default=Type.HOTEL)
+    property_type = models.CharField(
+        max_length=12, choices=Type.choices, default=Type.HOTEL
+    )
     description = models.TextField(blank=True)
     address = models.CharField(max_length=255)
     city = models.CharField(max_length=80, db_index=True)
@@ -80,7 +86,9 @@ class Property(models.Model):
     def starting_price(self):
         if hasattr(self, "min_price"):
             return self.min_price
-        return self.rooms.filter(is_active=True).aggregate(m=Min("price_per_night"))["m"]
+        return self.rooms.filter(is_active=True).aggregate(m=Min("price_per_night"))[
+            "m"
+        ]
 
     @property
     def rating(self):
@@ -94,7 +102,9 @@ def property_image_path(instance, filename):
 
 
 class PropertyImage(models.Model):
-    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="images")
+    property = models.ForeignKey(
+        Property, on_delete=models.CASCADE, related_name="images"
+    )
     image = models.ImageField(upload_to=property_image_path)
     caption = models.CharField(max_length=120, blank=True)
     is_cover = models.BooleanField(default=False)
@@ -117,7 +127,9 @@ class PropertyImage(models.Model):
 class Room(models.Model):
     """A room type within a property; `quantity` identical units are available."""
 
-    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="rooms")
+    property = models.ForeignKey(
+        Property, on_delete=models.CASCADE, related_name="rooms"
+    )
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     price_per_night = models.DecimalField(max_digits=10, decimal_places=2)

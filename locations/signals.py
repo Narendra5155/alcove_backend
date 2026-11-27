@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 def sync_index(sender, instance, **kwargs):
     try:
         services.index_property(instance)
-    except Exception:  # noqa: BLE001 - index is rebuildable; never block a save
+    except Exception:  # index is rebuildable; never block a save
         log.exception("Failed to index property %s", instance.pk)
 
 
@@ -22,5 +22,5 @@ def sync_index(sender, instance, **kwargs):
 def drop_index(sender, instance, **kwargs):
     try:
         services.unindex_property(instance.pk)
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("Failed to unindex property %s", instance.pk)
